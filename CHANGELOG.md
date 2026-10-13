@@ -12,4 +12,5 @@
 - 레벨 읽기·변경은 스레드 안전(`Volatile`, `Interlocked`)
 - 결과 규약 `Result`, `Result<T>`: 정상 실패는 코드로 반환, 오용은 즉시 예외. `default` 는 `Unknown` 실패, 실패한 결과의 `Value` 는 `InvalidOperationException`, `FromException` 으로 예외를 코드로 변환
 - 빌드 환경 `AppEnv`(`Current`, `IsDev`/`IsQA`/`IsProd`, `Name`)와 `AppEnvironment`(Dev 1, QA 2, Prod 3). 값은 `GEUNEDA_ENV_DEV`/`GEUNEDA_ENV_QA`/`GEUNEDA_ENV_PROD` define 으로 정하고, 없으면 에디터와 개발 빌드는 Dev, 릴리스 빌드는 Prod. 둘 이상 정의하면 컴파일 오류
+- 메인 스레드 디스패처 `MainThreadDispatcher`(`Post`, `IsMainThread`): PlayerLoop Update 의 MonoBehaviour Update 바로 앞에서 쌓인 작업을 모두 실행(프레임당 제한 없음), 작업 예외 격리, 플레이 세션 시작 시 남은 작업 리셋
 - 공용 결과 코드 `ResultCodes`(0 성공, 1 Unknown, 2 Cancelled, 3 Timeout, 4 NetworkError, 5 InProgress)와 패키지별 1000 단위 코드 범위 규칙(README)

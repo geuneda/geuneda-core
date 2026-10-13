@@ -9,11 +9,11 @@
 
 ## 2. 규칙
 
-- **static 상태 허용 목록**(geuneda 결정 D2): 로거(`Log`)와 메인 스레드 디스패처만 static 가변 상태를 가질 수 있습니다. 그 밖의 서비스는 인터페이스로 만들고 services 의 `MainInstaller` 로 바인딩합니다. 허용 목록을 늘리려면 이 절을 먼저 고칩니다.
+- **static 상태 허용 목록**(geuneda 결정 D2): 로거(`Log`)와 메인 스레드 디스패처(`MainThreadDispatcher`)만 static 가변 상태를 가질 수 있습니다. 그 밖의 서비스는 인터페이스로 만들고 services 의 `MainInstaller` 로 바인딩합니다. 허용 목록을 늘리려면 이 절을 먼저 고칩니다.
 - static 가변 상태는 `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]` 에서 기본값으로 되돌립니다. 도메인 리로드를 끈 Enter Play Mode 에서 이전 세션 상태가 남지 않게 하기 위해서입니다.
 - 외부 패키지(UniTask, Newtonsoft 등)에 의존하지 않습니다. 필요하면 별도 패키지로 만듭니다.
 - 런타임 어셈블리에서 `UnityEditor` 를 참조하지 않습니다.
-- 기능 추가 시 `README.md` 기능 표, `CHANGELOG.md`, `package.json` 버전을 함께 갱신하고, geuneda-frameworks 메타 레포의 스킬 문서(`claude-skills/geuneda-core/`)도 맞춰 고칩니다.
+- 기능 추가 시 `README.md` 기능 표, `CHANGELOG.md`, `package.json` 버전을 함께 갱신하고(첫 릴리스 전에는 버전을 0.1.0 으로 두고 `[Unreleased]` 에 쌓습니다), geuneda-frameworks 메타 레포의 스킬 문서(`claude-skills/geuneda-core/`)도 맞춰 고칩니다.
 
 ## 3. 로거 (`Runtime/Logging/`)
 
@@ -53,6 +53,15 @@
 - `IsProd` 등은 `const` 가 아니라 프로퍼티입니다. `const` 로 바꾸면 소비 코드에 도달 불가 코드 경고(CS0162)가 납니다.
 - define 조합별 컴파일 결과는 `[Explicit]` 테스트 `AppEnvPlayerCompileTest`(플레이어 스크립트 컴파일, 느림)로 확인합니다. 규칙을 바꾸면 `--filter Geuneda.Core.Tests.AppEnvPlayerCompileTest` 로 직접 실행하세요.
 
-## 6. 테스트
+## 6. 메인 스레드 디스패처 (`Runtime/Threading/`)
 
-- `Tests/EditMode/` (`Geuneda.Core.Tests.EditMode`). 출력 대상은 기록용 `ILogSink` 로 바꾸고 `TearDown` 에서 되돌립니다.
+- `MainThreadDispatcher` 는 D2 의 두 번째 static 허용 대상입니다. `SubsystemRegistration` 의 `Initialize` 가 상태를 리셋하고(`ResetState`: 남은 작업 버림, 메인 스레드 ID 기록) PlayerLoop Update 단계의 `ScriptRunBehaviourUpdate` 바로 앞에 `MainThreadDispatcherUpdate` 단계를 넣습니다(없으면 Update 맨 앞). 이전 세션의 같은 단계는 지우고 넣습니다. Update 맨 앞(index 0)에 넣지 마세요. UniTask 가 `AfterAssembliesLoaded` 에서 맨 앞에 자기 단계를 넣어 위치가 바뀝니다(도메인 리로드 끔, 플레이어 빌드).
+- 큐는 lock + 리스트 두 개를 바꿔 쓰는 방식입니다. 처리 중에 들어온 작업은 다음 처리로 갑니다. 작업 안에서 `ProcessQueue` 가 다시 불리면 아무것도 하지 않습니다(처리 중인 리스트 보호).
+- Percent ActionQueue 의 프레임당 1개 제한은 따르지 않습니다. 처리 시점의 작업을 모두 실행합니다.
+- 작업 예외는 잡아서 `ModuleLogger` 로 Error 를 남깁니다. 처리 루프 밖으로 예외를 내보내지 마세요(PlayerLoop 단계가 예외를 던지면 그 프레임의 남은 작업이 밀립니다).
+- 런타임 어셈블리라 편집 모드 처리(`EditorApplication.update`)는 넣지 않았습니다.
+
+## 7. 테스트
+
+- `Tests/EditMode/` (`Geuneda.Core.Tests.EditMode`). 출력 대상은 기록용 `ILogSink` 로 바꾸고 `TearDown` 에서 되돌립니다. 디스패처 큐는 `ResetState`/`ProcessQueue` 를 직접 불러 확인합니다(InternalsVisibleTo).
+- `Tests/PlayMode/` (`Geuneda.Core.Tests.PlayMode`). PlayerLoop 연결과 실제 프레임 처리처럼 플레이 중에만 확인할 수 있는 것.

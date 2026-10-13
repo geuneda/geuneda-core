@@ -7,6 +7,7 @@
 | 모듈별 로거 | `ModuleLogger`, `Log`, `LogLevel`, `LogEntry`, `ILogSink`, `UnityConsoleSink` | `Geuneda.Core` |
 | 결과 규약 | `Result`, `Result<T>`, `ResultCodes` | `Geuneda.Core` |
 | 빌드 환경(DEV/QA/PROD) | `AppEnv`, `AppEnvironment` | `Geuneda.Core` |
+| 메인 스레드 디스패처 | `MainThreadDispatcher` | `Geuneda.Core` |
 
 ## 설치
 
@@ -215,6 +216,34 @@ CheatMenu.Register();
 - `AppEnv.IsProd` 같은 프로퍼티로 분기한 코드는 빌드에 남습니다. 운영 빌드에서 반드시 빠져야 하는 코드는 위 예제처럼 `#if !GEUNEDA_ENV_PROD && (UNITY_EDITOR || DEVELOPMENT_BUILD || GEUNEDA_ENV_DEV || GEUNEDA_ENV_QA)` 로 감쌉니다. 이 조건은 `AppEnv.Current` 가 Prod 가 아닌 경우와 같습니다. define 없는 릴리스 빌드도 Prod 라 `#if !GEUNEDA_ENV_PROD` 만으로는 빠지지 않고, `GEUNEDA_ENV_PROD` 를 넣은 개발 빌드·에디터도 Prod 라 `UNITY_EDITOR || DEVELOPMENT_BUILD` 만으로도 안 됩니다.
 - Addressables 콘텐츠 빌드는 개발 빌드 옵션과 `extraScriptingDefines` 없이(Addressables 2.x 는 `ADDRESSABLES_ADD_DEFINES` 를 넣었을 때만 전달) 플레이어 스크립트를 컴파일합니다. 그래서 콘텐츠의 타입 정보는 플레이어와 다른 환경으로 컴파일될 수 있습니다. 직렬화 필드를 환경 define 으로 바꾸지 마세요.
 - 실행 중에는 바뀌지 않습니다. 환경마다 다른 값(서버 주소 등)은 코드나 설정 에셋에 두고 `AppEnv.Current` 로 고릅니다.
+
+## 메인 스레드 디스패처
+
+SDK 콜백이나 스레드 풀처럼 다른 스레드에서 받은 작업을 Unity 메인 스레드에서 실행합니다. Unity API 는 대부분 메인 스레드에서만 부를 수 있습니다.
+
+```csharp
+using Geuneda.Core;
+
+// SDK 가 백그라운드 스레드에서 부르는 콜백
+private void OnPurchaseCompleted(string productId)
+{
+    MainThreadDispatcher.Post(() => _shopView.ShowReceipt(productId));
+}
+
+if (!MainThreadDispatcher.IsMainThread)
+{
+    // 메인 스레드가 아니면 Unity API 를 직접 부르지 않는다
+}
+```
+
+- 플레이 세션이 시작될 때(`SubsystemRegistration`) PlayerLoop Update 단계에서 MonoBehaviour `Update` 를 실행하는 `ScriptRunBehaviourUpdate` 바로 앞에 처리 단계를 넣습니다. GameObject 가 필요 없고, 같은 프레임의 `Update` 보다 먼저 실행됩니다. UniTask 처럼 Update 맨 앞에 단계를 넣는 라이브러리와 함께 써도 이 위치는 유지됩니다.
+- 한 번 처리할 때 그때까지 쌓인 작업을 넣은 순서대로 모두 실행합니다(프레임당 개수 제한 없음). 처리 중에 넣은 작업은 다음 프레임에 실행합니다.
+- 메인 스레드에서 `Post` 해도 바로 실행하지 않고 다음 처리 때 실행합니다. 바로 실행하려면 `IsMainThread` 를 먼저 확인합니다.
+- 작업 하나가 예외를 던져도 `Geuneda.Core.MainThreadDispatcher` 로거로 Error 를 남기고 나머지를 계속 실행합니다.
+- 플레이 중에 쓰도록 만든 것입니다. 편집 모드에서의 실행은 보장하지 않습니다. 플레이 세션이 시작될 때 이전 세션에 남은 작업은 버리므로, `Post` 는 `AfterAssembliesLoaded` 이후에 합니다.
+- `IsMainThread` 는 플레이 세션이 시작될 때 기록한 메인 스레드와 비교합니다. 에디터를 연 뒤 한 번도 플레이하지 않았으면 false 이고, 한 번 기록한 뒤에는 편집 모드에서도 메인 스레드면 true 입니다.
+- PlayerLoop 를 통째로 새로 설정하는 코드(`PlayerLoop.SetPlayerLoop(PlayerLoop.GetDefaultPlayerLoop())` 등)가 있으면 처리 단계가 빠집니다. 다른 라이브러리처럼 `GetCurrentPlayerLoop` 를 고쳐 설정하세요.
+- UniTask 를 쓰는 코드는 `await UniTask.SwitchToMainThread()` 도 쓸 수 있습니다. 이 디스패처는 외부 의존성 없이 콜백 SDK 를 감쌀 때 씁니다.
 
 ## 요구 사항
 
