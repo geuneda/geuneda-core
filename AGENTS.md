@@ -31,6 +31,20 @@
 - `ModuleLogger` 안에서는 메서드 이름 `Debug` 때문에 Unity 의 `Debug` 를 `UnityEngine.Debug` 로 적어야 합니다.
 - `Verbose`/`Debug` 의 조건부 컴파일은 호출하는 쪽 어셈블리의 심볼로 결정됩니다.
 
-## 4. 테스트
+## 4. 결과 규약 (`Runtime/Results/`)
+
+| 타입 | 역할 |
+|---|---|
+| `Result` | 값 없는 결과. `bool _isSuccess` + `int _code`. `default` 는 `Unknown` 실패가 되도록 `Code` 가 `_code == 0` 인 실패를 `Unknown` 으로 보고함 |
+| `Result<T>` | `Result` 와 값을 담음. 실패에서 `Value` 는 `InvalidOperationException`. `Result` 로 암시적 변환 |
+| `ResultCodes` | 공용 코드 1~999 와 `FromException`(OCE → Cancelled, TimeoutException → Timeout, 그 밖 Unknown) |
+
+- 규약: 실행 중 일어날 수 있는 실패(네트워크, 타임아웃, 취소, 서버 거절, 중복 실행)는 `Result` 코드로 돌려주고, 오용(잘못된 인자·상태)은 즉시 예외로 거절합니다. 새 패키지의 공개 비동기 API 는 이 규약을 따릅니다.
+- `FromException` 은 변환만 합니다. 정상 실패 예외만 타입별로 잡아 넘기고, `catch (Exception)` 으로 오용·버그를 결과로 숨기지 않습니다. 정상 실패(취소 포함)는 Error 로 남기지 않습니다. README 예제는 `Tests/EditMode/Results/ResultConventionTest.cs` 와 같은 모양으로 유지합니다.
+- `default` 가 성공으로 보이면 안 됩니다. 성공 여부를 코드 값만으로 판단하도록 바꾸지 마세요.
+- 공용 코드는 모든 패키지가 같은 뜻으로 쓰는 것만 추가합니다. 값은 바꾸거나 재사용하지 않습니다(저장·전송된 코드와 어긋남).
+- 패키지별 코드 블록은 `README.md` 의 "결과 코드 범위" 표에 등록합니다.
+
+## 5. 테스트
 
 - `Tests/EditMode/` (`Geuneda.Core.Tests.EditMode`). 출력 대상은 기록용 `ILogSink` 로 바꾸고 `TearDown` 에서 되돌립니다.
