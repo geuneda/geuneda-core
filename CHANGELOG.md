@@ -14,4 +14,5 @@
 - 빌드 환경 `AppEnv`(`Current`, `IsDev`/`IsQA`/`IsProd`, `Name`)와 `AppEnvironment`(Dev 1, QA 2, Prod 3). 값은 `GEUNEDA_ENV_DEV`/`GEUNEDA_ENV_QA`/`GEUNEDA_ENV_PROD` define 으로 정하고, 없으면 에디터와 개발 빌드는 Dev, 릴리스 빌드는 Prod. 둘 이상 정의하면 컴파일 오류
 - 메인 스레드 디스패처 `MainThreadDispatcher`(`Post`, `IsMainThread`): PlayerLoop Update 의 MonoBehaviour Update 바로 앞에서 쌓인 작업을 모두 실행(프레임당 제한 없음), 작업 예외 격리, 플레이 세션 시작 시 남은 작업 리셋
 - 설정 에셋 `ConfigAssetLoader`(에디터 전용 `.user` 개인 덮어쓰기 → Resources → 대체 로더 대리자, 캐시 없음), `[ConfigAssetPath]`, 환경별 값 `EnvValue<T>`. `.user` 는 `Editor/Resources` 에 두고(빌드에서 빠짐), 에디터 어셈블리 `Geuneda.Core.Editor` 의 빌드 전 훅이 Editor 폴더 밖이나 StreamingAssets 안의 `*.user` 에셋이 있으면 플레이어 빌드를 실패시킴. `.gitignore` 에 `*.user.asset(.meta)` 추가
+- 설치 ID·기기 ID `IAppIdentity`/`AppIdentity`: 설치 ID 는 PlayerPrefs GUID(앱 데이터가 지워지면 새로, 백업 복원 시 이전 값), 기기 ID 는 iOS 키체인 GUID(재설치해도 유지, 읽기 실패 때 덮어쓰지 않고 identifierForVendor 로 대체), 그 밖은 `SystemInfo.deviceUniqueIdentifier`. iOS 네이티브 플러그인 `GeunedaKeychain.mm`
 - 공용 결과 코드 `ResultCodes`(0 성공, 1 Unknown, 2 Cancelled, 3 Timeout, 4 NetworkError, 5 InProgress)와 패키지별 1000 단위 코드 범위 규칙(README)

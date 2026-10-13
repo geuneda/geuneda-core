@@ -9,6 +9,7 @@
 | 빌드 환경(DEV/QA/PROD) | `AppEnv`, `AppEnvironment` | `Geuneda.Core` |
 | 메인 스레드 디스패처 | `MainThreadDispatcher` | `Geuneda.Core` |
 | 설정 에셋 | `ConfigAssetLoader`, `ConfigAssetPathAttribute`, `EnvValue<T>` | `Geuneda.Core` |
+| 설치 ID, 기기 ID | `IAppIdentity`, `AppIdentity` | `Geuneda.Core` |
 
 ## 설치
 
@@ -284,6 +285,31 @@ MainInstaller.Bind<IGameConfig>(configs.Load<GameConfig>());
 - git 에 올리지 않도록 `.gitignore` 에 `*.user.asset` 과 `*.user.asset.meta` 를 넣으세요. 이름은 소문자 `.user` 로 씁니다.
 - `.user` 에셋(대소문자 무시)이 `Editor` 폴더 밖에 있거나 `Assets/StreamingAssets` 안에 있으면 빌드 전 훅(`Geuneda.Core.Editor`)이 플레이어 빌드를 실패시킵니다. Resources, 빌드 씬의 참조, Addressables 그룹, StreamingAssets(안의 Editor 폴더까지 그대로 복사) 중 어디로든 빌드 파일에 들어갈 수 있어서입니다. Addressables 콘텐츠 빌드만 따로 할 때는 검사하지 않습니다.
 - `EnvValue<T>` 는 dev/qa/prod 값을 모두 담고 `Value` 로 이 빌드의 환경 값을 고릅니다. 세 값이 모두 빌드에 들어가므로 비밀 값(키, 토큰)은 넣지 않습니다.
+
+## 설치 ID 와 기기 ID
+
+```csharp
+using Geuneda.Core;
+
+// 부트스트랩(메인 스레드). MainInstaller 는 인터페이스로만 바인딩한다
+MainInstaller.Bind<IAppIdentity>(new AppIdentity());
+
+// 사용하는 쪽
+var identity = MainInstaller.Resolve<IAppIdentity>();
+analytics.SetCommonField("installation_id", identity.InstallId);
+```
+
+| ID | 값 | 다시 설치하면 |
+|----|----|---------------|
+| `InstallId` | 첫 실행에 만든 GUID(32자리 16진수), PlayerPrefs 에 저장 | 새로 만듦. 단 Android 자동 백업·iOS 백업 복원으로 PlayerPrefs 가 되살아나면 이전 값 |
+| `DeviceId` (iOS) | 첫 실행에 만든 GUID, 키체인에 저장(`AfterFirstUnlockThisDeviceOnly`) | 유지. 다른 기기로 옮겨지지 않음 |
+| `DeviceId` (Android) | `SystemInfo.deviceUniqueIdentifier`(ANDROID_ID 기반, 앱 서명 키별) | 유지. 공장 초기화하면 바뀜 |
+| `DeviceId` (에디터, 그 밖) | `SystemInfo.deviceUniqueIdentifier`. 지원하지 않으면 PlayerPrefs 에 저장한 GUID | 플랫폼에 따름 |
+
+- 만들 때 한 번 정해지고 바뀌지 않습니다. PlayerPrefs 와 `SystemInfo` 를 쓰므로 메인 스레드에서 만들어 바인딩합니다.
+- iOS 에서 키체인을 읽지 못하면(예: 기기를 한 번도 잠금 해제하지 않은 상태의 백그라운드 실행) 그 실행 동안 `identifierForVendor` 를 쓰고 Warning 을 남깁니다. 기존 값을 잃지 않도록 이때는 새 값을 쓰지 않습니다. 키체인에 쓰지 못해도 같은 방식으로 대체합니다.
+- iOS 키체인은 `Runtime/Plugins/iOS/GeunedaKeychain.mm`(Security.framework)을 씁니다. 항목의 서비스 이름은 `<번들 ID>.geuneda` 라 다른 앱과 공유하지 않습니다.
+- 다른 회사 앱의 데이터와 연결하는 추적에 쓰지 마세요(iOS 는 ATT 동의 대상). 개인정보 처리방침과 스토어 개인정보 항목에 기기 식별자 수집을 적습니다.
 
 ## 요구 사항
 

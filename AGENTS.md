@@ -68,7 +68,14 @@
 - `Geuneda.Core.Editor` 의 `UserConfigAssetBuildGuard` 는 Editor 폴더 밖, 또는 `Assets/StreamingAssets` 안(그 아래 Editor 폴더도 그대로 복사됨)의 `*.user.*`(대소문자 무시)가 있으면 플레이어 빌드를 실패시킵니다. Resources 만 보면 씬 참조나 Addressables 로 들어가는 경우를 놓치므로 범위를 좁히지 마세요. 경로 판단은 `FindUserAssetsThatCanShip` 순수 함수로 테스트합니다. `.user` 는 `Editor/Resources` 에 둡니다(에디터에서 읽히고 빌드에서 빠짐).
 - `EnvValue<T>` 는 직렬화 struct 입니다. 필드 이름(`_dev`, `_qa`, `_prod`)을 바꾸면 기존 에셋 값이 사라집니다.
 
-## 8. 테스트
+## 8. 설치 ID 와 기기 ID (`Runtime/Identity/`, `Runtime/Plugins/iOS/`)
+
+- `AppIdentity` 는 인스턴스이고 `IAppIdentity` 로 바인딩합니다(D2, `MainInstaller` 는 인터페이스만 받음). 저장소는 internal `IKeyValueStore`(기본 `PlayerPrefsStore`, 쓰면 바로 `PlayerPrefs.Save`)와 `ISecureStore`(iOS 플레이어만 `IosKeychainStore`, 그 밖은 null)로 주입하고, 테스트는 internal 생성자로 가짜를 넣습니다.
+- 키체인 읽기 결과가 `Failed` 면 새 값을 쓰지 마세요. 항목이 있는데 못 읽은 것일 수 있어 덮어쓰면 기기 ID 가 바뀝니다. 그 실행만 플랫폼 ID 로 대체합니다.
+- `GeunedaKeychain.mm` 은 ARC 여부와 관계없이 컴파일되도록 NSString 을 만들지 않고 바이트를 복사합니다. `GeunedaKeychain_Copy` 는 malloc 한 문자열을 돌려주고 IL2CPP 가 해제합니다. 함수 이름은 `IosKeychainStore` 의 `DllImport` 와 같아야 합니다. 플러그인 meta 는 iOS 만 켜고 `FrameworkDependencies: Security;` 입니다.
+- 키(`geuneda.core.installId`, `geuneda.core.deviceId`)와 키체인 서비스 이름(`<번들 ID>.geuneda`)을 바꾸면 기존 설치의 ID 가 바뀝니다.
+
+## 9. 테스트
 
 - `Tests/EditMode/` (`Geuneda.Core.Tests.EditMode`). 출력 대상은 기록용 `ILogSink` 로 바꾸고 `TearDown` 에서 되돌립니다. 디스패처 큐는 `ResetState`/`ProcessQueue` 를 직접 불러 확인합니다(InternalsVisibleTo).
 - 설정 에셋 실제 Resources 테스트는 `AssetDatabase.GenerateUniqueAssetPath` 로 만든 자기 임시 폴더(`Assets/GeunedaCoreConfigTestTemp*`)에만 에셋을 만들고, 만든 경우에만 `TearDown` 에서 지웁니다. 고정 경로를 지우지 마세요.
