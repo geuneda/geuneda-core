@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "unity": "2021.3",
   "license": "MIT",
-  "description": "다른 Geuneda 패키지가 함께 쓰는 바닥 패키지입니다. 의존성이 없습니다. 현재 기능: 모듈별 로거(레벨 비트 플래그, 호출자 정보, 교체 가능한 출력, 릴리스 빌드에서 Verbose/Debug 제거), 결과 규약(Result, Result<T>, 공용 결과 코드와 패키지별 코드 범위).",
+  "description": "다른 Geuneda 패키지가 함께 쓰는 바닥 패키지입니다. 의존성이 없습니다. 현재 기능: 모듈별 로거(레벨 비트 플래그, 호출자 정보, 교체 가능한 출력, 릴리스 빌드에서 Verbose/Debug 제거), 결과 규약(Result, Result<T>, 공용 결과 코드와 패키지별 코드 범위), 빌드 환경(DEV/QA/PROD define 으로 정하는 AppEnv).",
   "type": "library",
   "hideInEditor": false,
   "dependencies": {}

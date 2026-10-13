@@ -45,6 +45,14 @@
 - 공용 코드는 모든 패키지가 같은 뜻으로 쓰는 것만 추가합니다. 값은 바꾸거나 재사용하지 않습니다(저장·전송된 코드와 어긋남).
 - 패키지별 코드 블록은 `README.md` 의 "결과 코드 범위" 표에 등록합니다.
 
-## 5. 테스트
+## 5. 빌드 환경 (`Runtime/Environment/`)
+
+- `AppEnv.Current` 는 `#if` 로 정한 const 플래그를 `Resolve` 에 넘기는 읽기 전용 프로퍼티입니다. static 가변 상태가 아닙니다.
+- 결정은 `AppEnv.Resolve`(PROD, QA, DEV, 그 밖은 에디터·개발 빌드면 Dev, 릴리스면 Prod)이고, `#if` 로 정한 const 플래그를 넘깁니다. 진리표 테스트는 `AppEnvTest` 입니다.
+- `AppEnv.cs` 맨 위 `#error` 는 환경 define 중복만 막습니다. define 없는 릴리스 컴파일을 `#error` 로 막지 마세요. Addressables 콘텐츠 빌드가 개발 빌드 옵션과 추가 define 없이 플레이어 스크립트를 컴파일해 콘텐츠 빌드가 깨집니다(2026-10-13 재현). 운영 빌드에서 코드를 빼는 조건은 `#if !GEUNEDA_ENV_PROD && (UNITY_EDITOR || DEVELOPMENT_BUILD || GEUNEDA_ENV_DEV || GEUNEDA_ENV_QA)` 입니다(`Current != Prod` 와 같음, `AppEnvTest.StripCondition_MatchesNonProd`). `Resolve` 규칙을 바꾸면 이 조건과 문서도 함께 바꾸세요.
+- `IsProd` 등은 `const` 가 아니라 프로퍼티입니다. `const` 로 바꾸면 소비 코드에 도달 불가 코드 경고(CS0162)가 납니다.
+- define 조합별 컴파일 결과는 `[Explicit]` 테스트 `AppEnvPlayerCompileTest`(플레이어 스크립트 컴파일, 느림)로 확인합니다. 규칙을 바꾸면 `--filter Geuneda.Core.Tests.AppEnvPlayerCompileTest` 로 직접 실행하세요.
+
+## 6. 테스트
 
 - `Tests/EditMode/` (`Geuneda.Core.Tests.EditMode`). 출력 대상은 기록용 `ILogSink` 로 바꾸고 `TearDown` 에서 되돌립니다.

@@ -6,6 +6,7 @@
 |------|------|-------------|
 | 모듈별 로거 | `ModuleLogger`, `Log`, `LogLevel`, `LogEntry`, `ILogSink`, `UnityConsoleSink` | `Geuneda.Core` |
 | 결과 규약 | `Result`, `Result<T>`, `ResultCodes` | `Geuneda.Core` |
+| 빌드 환경(DEV/QA/PROD) | `AppEnv`, `AppEnvironment` | `Geuneda.Core` |
 
 ## 설치
 
@@ -183,6 +184,37 @@ else if (result.Code == ResultCodes.NetworkError || result.Code == ResultCodes.T
 - 패키지 코드는 패키지의 `<패키지>ResultCodes` static 클래스에 상수로 둡니다. 예: 블록이 1000 이면 `public const int InvalidResponse = 1001;`
 - 서버가 내려주는 오류 코드는 통신 패키지가 자기 블록 안의 코드로 옮기거나, 응답 본문에 따로 둡니다.
 - 아직 등록된 패키지 블록은 없습니다.
+
+## 빌드 환경
+
+앱이 붙는 서버와 설정의 환경(Dev, QA, Prod)은 컴파일 상수입니다. 빌드마다 Scripting Define Symbols(또는 Unity 6 Build Profile 의 Scripting Defines, 빌드 스크립트의 `extraScriptingDefines`)에 많아야 하나를 정의합니다.
+
+| define | `AppEnv.Current` | `AppEnv.Name` |
+|--------|------------------|---------------|
+| `GEUNEDA_ENV_PROD` | `AppEnvironment.Prod` | `prod` |
+| `GEUNEDA_ENV_QA` | `AppEnvironment.QA` | `qa` |
+| `GEUNEDA_ENV_DEV` | `AppEnvironment.Dev` | `dev` |
+| 없음, 에디터·개발 빌드 | `AppEnvironment.Dev` | `dev` |
+| 없음, 릴리스 빌드 | `AppEnvironment.Prod` | `prod` |
+| 둘 이상 | 컴파일 오류 | |
+
+```csharp
+using Geuneda.Core;
+
+var baseUrl = AppEnv.IsProd ? "https://api.example.com" : "https://api-dev.example.com";
+Logger.Info($"env={AppEnv.Name}");
+
+#if !GEUNEDA_ENV_PROD && (UNITY_EDITOR || DEVELOPMENT_BUILD || GEUNEDA_ENV_DEV || GEUNEDA_ENV_QA)
+// 운영 빌드에서는 컴파일되지 않는 치트 메뉴
+CheatMenu.Register();
+#endif
+```
+
+- define 이 없는 릴리스 빌드(개발 빌드가 아닌 빌드)는 스토어 빌드로 보고 Prod 입니다. QA 서버를 쓰는 릴리스 빌드는 `GEUNEDA_ENV_QA` 를 꼭 넣으세요. 넣지 않으면 운영 서버에 붙습니다.
+- 프로젝트 Scripting Define Symbols 에 넣은 define 은 에디터에도 적용됩니다. 에디터에서 다른 환경을 시험하려면 여기에 넣습니다. 빌드 스크립트의 `extraScriptingDefines` 는 그 플레이어 컴파일에만 적용되어 에디터의 `AppEnv.Current` 는 바뀌지 않습니다.
+- `AppEnv.IsProd` 같은 프로퍼티로 분기한 코드는 빌드에 남습니다. 운영 빌드에서 반드시 빠져야 하는 코드는 위 예제처럼 `#if !GEUNEDA_ENV_PROD && (UNITY_EDITOR || DEVELOPMENT_BUILD || GEUNEDA_ENV_DEV || GEUNEDA_ENV_QA)` 로 감쌉니다. 이 조건은 `AppEnv.Current` 가 Prod 가 아닌 경우와 같습니다. define 없는 릴리스 빌드도 Prod 라 `#if !GEUNEDA_ENV_PROD` 만으로는 빠지지 않고, `GEUNEDA_ENV_PROD` 를 넣은 개발 빌드·에디터도 Prod 라 `UNITY_EDITOR || DEVELOPMENT_BUILD` 만으로도 안 됩니다.
+- Addressables 콘텐츠 빌드는 개발 빌드 옵션과 `extraScriptingDefines` 없이(Addressables 2.x 는 `ADDRESSABLES_ADD_DEFINES` 를 넣었을 때만 전달) 플레이어 스크립트를 컴파일합니다. 그래서 콘텐츠의 타입 정보는 플레이어와 다른 환경으로 컴파일될 수 있습니다. 직렬화 필드를 환경 define 으로 바꾸지 마세요.
+- 실행 중에는 바뀌지 않습니다. 환경마다 다른 값(서버 주소 등)은 코드나 설정 에셋에 두고 `AppEnv.Current` 로 고릅니다.
 
 ## 요구 사항
 
