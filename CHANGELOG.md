@@ -4,7 +4,7 @@
 이 형식은 [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)를 기반으로 하며,
 이 프로젝트는 [Semantic Versioning](http://semver.org/spec/v2.0.0.html)을 따릅니다.
 
-## [Unreleased]
+## [0.1.0] - 2026-10-13
 
 **New**:
 - 모듈별 로거 `ModuleLogger`: 레벨 비트 플래그(`LogLevel`, 기본 Verbose/Debug 꺼짐), `[Caller*]` 호출자 정보, `throw logger.Fatal(exception)`, 릴리스 빌드에서 Verbose/Debug 호출 제거(`GEUNEDA_LOG_DEBUG` 로 유지 가능)
