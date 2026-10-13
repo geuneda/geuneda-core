@@ -181,12 +181,13 @@ else if (result.Code == ResultCodes.NetworkError || result.Code == ResultCodes.T
 |------|------|
 | 0 | 성공 |
 | 1 ~ 999 | core 공용 코드(`ResultCodes`) |
-| 1000 단위 블록(1000 ~ 99999) | 패키지별. 패키지가 처음 코드를 정의할 때 다음 빈 블록을 이 표에 등록합니다 |
+| 1000 ~ 1999 | `com.geuneda.http`(`HttpResultCodes`) |
+| 그 밖의 1000 단위 블록(2000 ~ 99999) | 패키지별. 패키지가 처음 코드를 정의할 때 다음 빈 블록을 이 표에 등록합니다 |
 | 100000 이상 | 게임 |
 
 - 패키지 코드는 패키지의 `<패키지>ResultCodes` static 클래스에 상수로 둡니다. 예: 블록이 1000 이면 `public const int InvalidResponse = 1001;`
 - 서버가 내려주는 오류 코드는 통신 패키지가 자기 블록 안의 코드로 옮기거나, 응답 본문에 따로 둡니다.
-- 아직 등록된 패키지 블록은 없습니다.
+- 다음 빈 블록은 2000 입니다.
 
 ## 빌드 환경
 
