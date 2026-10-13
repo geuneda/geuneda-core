@@ -4,6 +4,16 @@
 이 형식은 [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)를 기반으로 하며,
 이 프로젝트는 [Semantic Versioning](http://semver.org/spec/v2.0.0.html)을 따릅니다.
 
+## [0.2.0] - 2026-10-14
+
+**New**:
+- 보안 저장소 `ISecureStore`(`TryRead`/`TryWrite`/`TryDelete`, 결과 `SecureReadResult`)와 플랫폼 기본 구현 `PlatformSecureStore`: iOS 키체인(`AfterFirstUnlockThisDeviceOnly`), Android API 23 이상은 키스토어 AES-256-GCM 키로 암호화한 SharedPreferences(저장 키를 인증 데이터로 넣음, 복호화할 수 없는 값은 지우고 NotFound), 에디터와 그 밖의 플랫폼은 PlayerPrefs(암호화 없음, 에디터 밖에서는 Warning). 키와 값의 NUL 문자는 예외. Android 네이티브 플러그인 `GeunedaSecureStore.java`
+- Android Gradle 프로젝트 생성 훅 `AndroidProguardRulesHook`(`Geuneda.Core.Editor`): R8 축소 빌드에서 Java 플러그인이 지워지지 않게 keep 규칙을 `unityLibrary/proguard-unity.txt` 에 넣음
+- 결과 코드 범위 표에 `com.geuneda.account`(3000 ~ 3999) 등록
+
+**Changed**:
+- iOS 키체인 플러그인 `GeunedaKeychain.mm` 에 값 갱신(`GeunedaKeychain_Set`)과 삭제(`GeunedaKeychain_Delete`)를 추가하고 추가 전용 `GeunedaKeychain_Add` 를 뺐습니다. 길이 0 인 값도 읽습니다. 기존 항목과 키는 그대로라 기기 ID 는 바뀌지 않습니다
+
 ## [0.1.0] - 2026-10-13
 
 **New**:

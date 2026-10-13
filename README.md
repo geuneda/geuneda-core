@@ -10,6 +10,7 @@
 | 메인 스레드 디스패처 | `MainThreadDispatcher` | `Geuneda.Core` |
 | 설정 에셋 | `ConfigAssetLoader`, `ConfigAssetPathAttribute`, `EnvValue<T>` | `Geuneda.Core` |
 | 설치 ID, 기기 ID | `IAppIdentity`, `AppIdentity` | `Geuneda.Core` |
+| 보안 저장소(iOS 키체인, Android 키스토어) | `ISecureStore`, `PlatformSecureStore`, `SecureReadResult` | `Geuneda.Core` |
 
 ## 설치
 
@@ -183,13 +184,14 @@ else if (result.Code == ResultCodes.NetworkError || result.Code == ResultCodes.T
 | 1 ~ 999 | core 공용 코드(`ResultCodes`) |
 | 1000 ~ 1999 | `com.geuneda.http`(`HttpResultCodes`) |
 | 2000 ~ 2999 | `com.geuneda.realtime`(`RealtimeResultCodes`) |
-| 그 밖의 1000 단위 블록(3000 ~ 99999) | 패키지별. 패키지가 처음 코드를 정의할 때 다음 빈 블록을 이 표에 등록합니다 |
+| 3000 ~ 3999 | `com.geuneda.account`(`AccountResultCodes`) |
+| 그 밖의 1000 단위 블록(4000 ~ 99999) | 패키지별. 패키지가 처음 코드를 정의할 때 다음 빈 블록을 이 표에 등록합니다 |
 | 100000 ~ 100999 | 실시간 RPC 서버 프레임워크 응답 상태(`com.geuneda.realtime` 의 `RpcStatusCodes`) |
 | 101000 이상 | 게임 |
 
 - 패키지 코드는 패키지의 `<패키지>ResultCodes` static 클래스에 상수로 둡니다. 예: 블록이 1000 이면 `public const int InvalidResponse = 1001;`
 - 서버가 내려주는 오류 코드는 게임 범위(101000 이상)로 정해 그대로 쓰거나(realtime), 통신 패키지가 자기 블록 안의 코드로 옮기거나, 응답 본문에 따로 둡니다.
-- 다음 빈 블록은 3000 입니다.
+- 다음 빈 블록은 4000 입니다.
 
 ## 빌드 환경
 
@@ -313,6 +315,59 @@ analytics.SetCommonField("installation_id", identity.InstallId);
 - iOS 에서 키체인을 읽지 못하면(예: 기기를 한 번도 잠금 해제하지 않은 상태의 백그라운드 실행) 그 실행 동안 `identifierForVendor` 를 쓰고 Warning 을 남깁니다. 기존 값을 잃지 않도록 이때는 새 값을 쓰지 않습니다. 키체인에 쓰지 못해도 같은 방식으로 대체합니다.
 - iOS 키체인은 `Runtime/Plugins/iOS/GeunedaKeychain.mm`(Security.framework)을 씁니다. 항목의 서비스 이름은 `<번들 ID>.geuneda` 라 다른 앱과 공유하지 않습니다.
 - 다른 회사 앱의 데이터와 연결하는 추적에 쓰지 마세요(iOS 는 ATT 동의 대상). 개인정보 처리방침과 스토어 개인정보 항목에 기기 식별자 수집을 적습니다.
+
+## 보안 저장소
+
+토큰이나 비밀 값처럼 민감한 문자열을 기기에 보관합니다.
+
+```csharp
+using Geuneda.Core;
+
+// 부트스트랩(메인 스레드)
+MainInstaller.Bind<ISecureStore>(new PlatformSecureStore());
+
+// 읽기
+var store = MainInstaller.Resolve<ISecureStore>();
+
+switch (store.TryRead("my.refreshToken", out var token))
+{
+    case SecureReadResult.Found:
+        // token 사용
+        break;
+    case SecureReadResult.NotFound:
+        // 처음이거나 지워짐. 새 값을 만들어 써도 된다
+        break;
+    case SecureReadResult.Failed:
+        // 있는지 알 수 없음. 이 실행에서는 이 키에 쓰거나 지우지 말고 나중에 다시 읽는다
+        return;
+}
+```
+
+```csharp
+// 쓰기와 삭제. 실패하면 false(저장소 오류). 이 실행 동안은 메모리 값으로 계속할 수 있다
+if (!store.TryWrite("my.refreshToken", newToken))
+{
+    // 다음 실행에서 다시 로그인해야 할 수 있음
+}
+
+if (!store.TryDelete("my.refreshToken"))   // 원래 없었어도 true
+{
+    // 지우지 못함. 값이 남아 있을 수 있으니 지워진 것으로 보지 않는다
+}
+```
+
+| 플랫폼 | 저장 방식 | 앱을 다시 설치하면 |
+|--------|-----------|-------------------|
+| iOS | 키체인(`AfterFirstUnlockThisDeviceOnly`, 서비스 이름 `<번들 ID>.geuneda`) | 남음. 백업을 다른 기기에 복원하면 옮겨지지 않음 |
+| Android (API 23 이상) | 키스토어의 AES-256-GCM 키로 암호화해 앱 전용 SharedPreferences(`geuneda.core.securestore`)에 저장 | 사라짐 |
+| 에디터, 그 밖의 플랫폼, Android API 22 이하 | PlayerPrefs(`geuneda.secure.` 접두사)에 암호화 없이 저장. 에디터가 아니면 만들 때 Warning | PlayerPrefs 와 같음 |
+
+- 실패는 반환값으로 알립니다. 빈 키, null 값, NUL 문자(`\0`)를 담은 키·값은 예외입니다. PlayerPrefs 와 JNI 를 쓰므로 메인 스레드에서 부릅니다.
+- `Failed` 는 값이 있는지 알 수 없다는 뜻입니다(예: iOS 에서 기기를 한 번도 잠금 해제하지 않은 상태의 백그라운드 실행). 이때 새 값을 쓰면 기존 값을 잃을 수 있습니다.
+- Android 키스토어 키는 기기 밖으로 나가지 않습니다. 자동 백업으로 SharedPreferences 가 복원되었거나 키가 다시 만들어져 복호화할 수 없는 값은 지우고 `NotFound` 로 돌려줍니다. 저장 키를 암호화의 인증 데이터로 넣으므로, 파일에서 다른 항목의 암호문을 옮겨 넣은 값도 같은 방식으로 거절합니다.
+- Android R8 축소(Minify) 빌드에서도 동작합니다. 에디터 훅(`Geuneda.Core.Editor`)이 Gradle 프로젝트를 만들 때 Java 플러그인의 keep 규칙을 `unityLibrary/proguard-unity.txt` 에 넣습니다.
+- iOS 값은 앱을 지워도 남으므로, 다시 설치했을 때 지워야 하는 값(로그인 토큰 등)은 사용하는 쪽이 설치 여부를 확인해 지웁니다.
+- iOS 는 `Runtime/Plugins/iOS/GeunedaKeychain.mm`(Security.framework), Android 는 `Runtime/Plugins/Android/GeunedaSecureStore.java` 를 씁니다.
 
 ## 요구 사항
 

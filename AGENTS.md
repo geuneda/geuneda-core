@@ -68,14 +68,22 @@
 - `Geuneda.Core.Editor` 의 `UserConfigAssetBuildGuard` 는 Editor 폴더 밖, 또는 `Assets/StreamingAssets` 안(그 아래 Editor 폴더도 그대로 복사됨)의 `*.user.*`(대소문자 무시)가 있으면 플레이어 빌드를 실패시킵니다. Resources 만 보면 씬 참조나 Addressables 로 들어가는 경우를 놓치므로 범위를 좁히지 마세요. 경로 판단은 `FindUserAssetsThatCanShip` 순수 함수로 테스트합니다. `.user` 는 `Editor/Resources` 에 둡니다(에디터에서 읽히고 빌드에서 빠짐).
 - `EnvValue<T>` 는 직렬화 struct 입니다. 필드 이름(`_dev`, `_qa`, `_prod`)을 바꾸면 기존 에셋 값이 사라집니다.
 
-## 8. 설치 ID 와 기기 ID (`Runtime/Identity/`, `Runtime/Plugins/iOS/`)
+## 8. 설치 ID 와 기기 ID (`Runtime/Identity/`)
 
 - `AppIdentity` 는 인스턴스이고 `IAppIdentity` 로 바인딩합니다(D2, `MainInstaller` 는 인터페이스만 받음). 저장소는 internal `IKeyValueStore`(기본 `PlayerPrefsStore`, 쓰면 바로 `PlayerPrefs.Save`)와 `ISecureStore`(iOS 플레이어만 `IosKeychainStore`, 그 밖은 null)로 주입하고, 테스트는 internal 생성자로 가짜를 넣습니다.
+- 기기 ID 에는 `PlatformSecureStore` 를 쓰지 않습니다. Android 키스토어 값은 앱을 지우면 사라지므로 Android 는 ANDROID_ID 기반 `SystemInfo.deviceUniqueIdentifier` 를 씁니다.
 - 키체인 읽기 결과가 `Failed` 면 새 값을 쓰지 마세요. 항목이 있는데 못 읽은 것일 수 있어 덮어쓰면 기기 ID 가 바뀝니다. 그 실행만 플랫폼 ID 로 대체합니다.
-- `GeunedaKeychain.mm` 은 ARC 여부와 관계없이 컴파일되도록 NSString 을 만들지 않고 바이트를 복사합니다. `GeunedaKeychain_Copy` 는 malloc 한 문자열을 돌려주고 IL2CPP 가 해제합니다. 함수 이름은 `IosKeychainStore` 의 `DllImport` 와 같아야 합니다. 플러그인 meta 는 iOS 만 켜고 `FrameworkDependencies: Security;` 입니다.
 - 키(`geuneda.core.installId`, `geuneda.core.deviceId`)와 키체인 서비스 이름(`<번들 ID>.geuneda`)을 바꾸면 기존 설치의 ID 가 바뀝니다.
 
-## 9. 테스트
+## 9. 보안 저장소 (`Runtime/SecureStorage/`, `Runtime/Plugins/`)
+
+- `PlatformSecureStore` 는 인자(빈 키, null 값, 키·값의 NUL 문자)를 검사한 뒤 플랫폼 구현(internal)에 넘깁니다. NUL 검사를 빼지 마세요. iOS 플러그인이 C 문자열로 다뤄 키가 잘리면 다른 항목을 덮어씁니다. 플랫폼 구현: iOS 플레이어 `IosKeychainStore`, Android 플레이어 API 23 이상 `AndroidKeystoreStore`, 그 밖은 `PlayerPrefsSecureStore`(키 접두사 `geuneda.secure.`). 구현은 실패를 반환값으로 바꾸고 예외를 내보내지 않습니다.
+- `GeunedaKeychain.mm` 은 ARC 여부와 관계없이 컴파일되도록 NSString 을 만들지 않고 바이트를 복사합니다. `GeunedaKeychain_Copy` 는 malloc 한 문자열을 돌려주고 IL2CPP 가 해제합니다(길이 0 이면 빈 문자열, 성공 상태에서 결과가 없으면 `errSecInternalError`). `GeunedaKeychain_Set` 은 갱신 후 없으면 추가하고, 추가할 때만 접근성(`AfterFirstUnlockThisDeviceOnly`)을 넣습니다. 함수 이름은 `IosKeychainStore` 의 `DllImport` 와 같아야 합니다. 플러그인 meta 는 iOS 만 켜고 `FrameworkDependencies: Security;` 입니다.
+- `GeunedaSecureStore.java`(meta 는 Android 만 켬)는 키스토어 별칭과 SharedPreferences 파일 이름이 모두 `geuneda.core.securestore` 이고, 값은 Base64(IV 12바이트 + 암호문 + 태그 16바이트)이며 저장 키(UTF-8)를 GCM 인증 데이터(AAD)로 넣습니다(항목 간 암호문 교체 검출). 키가 없거나, 형식이 깨졌거나, 태그가 맞지 않는(`AEADBadTagException`) 값은 지우고 null(NotFound)을 돌려줍니다. 그 밖의 예외는 C# 에서 `AndroidJavaException` 으로 잡아 `Failed`/false 입니다. 별칭, 파일 이름, 저장 형식을 바꾸면 기존 값을 읽지 못합니다.
+- C# 가 Java 클래스를 이름으로만 부르므로 R8 축소 빌드에서 지워질 수 있습니다. `Editor/AndroidProguardRulesHook.cs`(`#if UNITY_ANDROID`, `IPostGenerateGradleAndroidProject`)가 `AndroidProguardRules.Rule` 을 unityLibrary 의 `proguard-unity.txt`(unityLibrary 의 consumerProguardFiles)에 넣습니다. Java 클래스 이름이나 공개 메서드를 바꾸면 규칙도 바꿉니다.
+- 기기 동작(키 분실, 깨진 값, 앱 재시작 뒤 유지, 축소 빌드)은 에디터 테스트로 확인할 수 없습니다. 플랫폼 코드를 바꾸면 iOS 시뮬레이터와 Android 기기(또는 에뮬레이터)에서 다시 확인합니다.
+
+## 10. 테스트
 
 - `Tests/EditMode/` (`Geuneda.Core.Tests.EditMode`). 출력 대상은 기록용 `ILogSink` 로 바꾸고 `TearDown` 에서 되돌립니다. 디스패처 큐는 `ResetState`/`ProcessQueue` 를 직접 불러 확인합니다(InternalsVisibleTo).
 - 설정 에셋 실제 Resources 테스트는 `AssetDatabase.GenerateUniqueAssetPath` 로 만든 자기 임시 폴더(`Assets/GeunedaCoreConfigTestTemp*`)에만 에셋을 만들고, 만든 경우에만 `TearDown` 에서 지웁니다. 고정 경로를 지우지 마세요.

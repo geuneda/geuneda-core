@@ -31,8 +31,8 @@ namespace Geuneda.Core.Tests
 		{
 			public readonly Dictionary<string, string> Values = new Dictionary<string, string>();
 			public bool FailRead;
-			public bool FailAdd;
-			public int AddCalls;
+			public bool FailWrite;
+			public int WriteCalls;
 
 			public SecureReadResult TryRead(string key, out string value)
 			{
@@ -46,16 +46,22 @@ namespace Geuneda.Core.Tests
 				return Values.TryGetValue(key, out value) ? SecureReadResult.Found : SecureReadResult.NotFound;
 			}
 
-			public bool TryAdd(string key, string value)
+			public bool TryWrite(string key, string value)
 			{
-				AddCalls++;
+				WriteCalls++;
 
-				if (FailAdd || Values.ContainsKey(key))
+				if (FailWrite)
 				{
 					return false;
 				}
 
 				Values[key] = value;
+				return true;
+			}
+
+			public bool TryDelete(string key)
+			{
+				Values.Remove(key);
 				return true;
 			}
 		}
@@ -140,7 +146,7 @@ namespace Geuneda.Core.Tests
 			StringAssert.IsMatch(IdFormat.ToString(), first.DeviceId);
 			Assert.AreEqual(first.DeviceId, reinstalled.DeviceId);
 			Assert.AreNotEqual(first.InstallId, reinstalled.InstallId);
-			Assert.AreEqual(1, keychain.AddCalls);
+			Assert.AreEqual(1, keychain.WriteCalls);
 		}
 
 		[Test]
@@ -152,14 +158,14 @@ namespace Geuneda.Core.Tests
 			var identity = new AppIdentity(new MemoryStore(), keychain, () => "platform");
 
 			Assert.AreEqual("platform", identity.DeviceId);
-			Assert.AreEqual(0, keychain.AddCalls);
+			Assert.AreEqual(0, keychain.WriteCalls);
 			Assert.AreEqual("existing", keychain.Values[AppIdentity.DeviceIdKey]);
 		}
 
 		[Test]
-		public void DeviceId_SecureAddFails_UsesPlatformId()
+		public void DeviceId_SecureWriteFails_UsesPlatformId()
 		{
-			var keychain = new FakeSecureStore { FailAdd = true };
+			var keychain = new FakeSecureStore { FailWrite = true };
 
 			Assert.AreEqual("platform", new AppIdentity(new MemoryStore(), keychain, () => "platform").DeviceId);
 		}

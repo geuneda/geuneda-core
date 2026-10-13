@@ -1,4 +1,4 @@
-// Geuneda.Core AppIdentity 의 iOS 키체인 저장소(IosKeychainStore.cs)
+// Geuneda.Core 보안 저장소의 iOS 키체인 구현(IosKeychainStore.cs)
 // ARC 여부와 관계없이 동작하도록 NSString 을 직접 만들지 않고 바이트를 복사한다
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
@@ -32,6 +32,11 @@ extern "C" char* GeunedaKeychain_Copy(const char* key, int* status)
 
         if (copyStatus != errSecSuccess || result == NULL)
         {
+            if (copyStatus == errSecSuccess)
+            {
+                *status = (int)errSecInternalError;
+            }
+
             return NULL;
         }
 
@@ -44,20 +49,43 @@ extern "C" char* GeunedaKeychain_Copy(const char* key, int* status)
             memcpy(value, CFDataGetBytePtr(data), (size_t)length);
             value[length] = '\0';
         }
+        else
+        {
+            *status = (int)errSecAllocate;
+        }
 
         CFRelease(result);
         return value;
     }
 }
 
-// 새 항목을 추가하고 OSStatus 를 돌려준다. 이미 있으면 errSecDuplicateItem
-extern "C" int GeunedaKeychain_Add(const char* key, const char* value)
+// 값을 바꾸거나 없으면 추가하고 OSStatus 를 돌려준다
+extern "C" int GeunedaKeychain_Set(const char* key, const char* value)
 {
     @autoreleasepool
     {
-        NSMutableDictionary* query = GeunedaKeychainQuery(key);
-        query[(__bridge id)kSecValueData] = [NSData dataWithBytes:value length:strlen(value)];
-        query[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
-        return (int)SecItemAdd((__bridge CFDictionaryRef)query, NULL);
+        NSData* data = [NSData dataWithBytes:value length:strlen(value)];
+
+        NSDictionary* changes = @{ (__bridge id)kSecValueData: data };
+        OSStatus status = SecItemUpdate((__bridge CFDictionaryRef)GeunedaKeychainQuery(key), (__bridge CFDictionaryRef)changes);
+
+        if (status != errSecItemNotFound)
+        {
+            return (int)status;
+        }
+
+        NSMutableDictionary* item = GeunedaKeychainQuery(key);
+        item[(__bridge id)kSecValueData] = data;
+        item[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
+        return (int)SecItemAdd((__bridge CFDictionaryRef)item, NULL);
+    }
+}
+
+// 항목을 지우고 OSStatus 를 돌려준다. 없으면 errSecItemNotFound
+extern "C" int GeunedaKeychain_Delete(const char* key)
+{
+    @autoreleasepool
+    {
+        return (int)SecItemDelete((__bridge CFDictionaryRef)GeunedaKeychainQuery(key));
     }
 }

@@ -67,7 +67,7 @@ namespace Geuneda.Core
 					case SecureReadResult.NotFound:
 						var created = NewId();
 
-						if (secureStore.TryAdd(DeviceIdKey, created))
+						if (secureStore.TryWrite(DeviceIdKey, created))
 						{
 							return created;
 						}
@@ -110,6 +110,7 @@ namespace Geuneda.Core
 			return Guid.NewGuid().ToString("N");
 		}
 
+		// 다시 설치해도 남는 저장소만 쓴다. Android 키스토어 값은 앱을 지우면 사라지므로 ANDROID_ID 를 쓴다
 		private static ISecureStore CreatePlatformSecureStore()
 		{
 #if UNITY_IOS && !UNITY_EDITOR

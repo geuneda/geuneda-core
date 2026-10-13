@@ -13,22 +13,28 @@ namespace Geuneda.Core
 		private const int ErrSecSuccess = 0;
 		private const int ErrSecItemNotFound = -25300;
 
-		private static readonly ModuleLogger Logger = new ModuleLogger("Geuneda.Core.AppIdentity");
+		private static readonly ModuleLogger Logger = new ModuleLogger("Geuneda.Core.SecureStore");
 
 		[DllImport("__Internal")]
 		private static extern string GeunedaKeychain_Copy(string key, out int status);
 
 		[DllImport("__Internal")]
-		private static extern int GeunedaKeychain_Add(string key, string value);
+		private static extern int GeunedaKeychain_Set(string key, string value);
+
+		[DllImport("__Internal")]
+		private static extern int GeunedaKeychain_Delete(string key);
 
 		public SecureReadResult TryRead(string key, out string value)
 		{
 			value = GeunedaKeychain_Copy(key, out var status);
 
-			if (status == ErrSecSuccess && !string.IsNullOrEmpty(value))
+			if (status == ErrSecSuccess)
 			{
+				value ??= string.Empty;
 				return SecureReadResult.Found;
 			}
+
+			value = null;
 
 			if (status == ErrSecItemNotFound)
 			{
@@ -36,20 +42,32 @@ namespace Geuneda.Core
 			}
 
 			Logger.Warning($"Keychain read failed for '{key}' (OSStatus {status})");
-			value = null;
 			return SecureReadResult.Failed;
 		}
 
-		public bool TryAdd(string key, string value)
+		public bool TryWrite(string key, string value)
 		{
-			var status = GeunedaKeychain_Add(key, value);
+			var status = GeunedaKeychain_Set(key, value);
 
 			if (status == ErrSecSuccess)
 			{
 				return true;
 			}
 
-			Logger.Warning($"Keychain add failed for '{key}' (OSStatus {status})");
+			Logger.Warning($"Keychain write failed for '{key}' (OSStatus {status})");
+			return false;
+		}
+
+		public bool TryDelete(string key)
+		{
+			var status = GeunedaKeychain_Delete(key);
+
+			if (status == ErrSecSuccess || status == ErrSecItemNotFound)
+			{
+				return true;
+			}
+
+			Logger.Warning($"Keychain delete failed for '{key}' (OSStatus {status})");
 			return false;
 		}
 	}
