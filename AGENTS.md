@@ -61,7 +61,15 @@
 - 작업 예외는 잡아서 `ModuleLogger` 로 Error 를 남깁니다. 처리 루프 밖으로 예외를 내보내지 마세요(PlayerLoop 단계가 예외를 던지면 그 프레임의 남은 작업이 밀립니다).
 - 런타임 어셈블리라 편집 모드 처리(`EditorApplication.update`)는 넣지 않았습니다.
 
-## 7. 테스트
+## 7. 설정 에셋 (`Runtime/Config/`, `Editor/`)
+
+- `ConfigAssetLoader` 는 인스턴스이고 캐시가 없습니다(D2: static 가변 상태 금지). 대체 로더도 생성자로 받습니다. 정적 캐시나 전역 대체 로더를 추가하지 마세요.
+- 읽는 순서는 에디터에서만 `.user`, Resources, 대체 로더입니다. `.user` 판단은 컴파일 상수(`UNITY_EDITOR`)이고, 테스트는 internal 생성자로 Resources 함수와 `.user` 여부를 바꿉니다.
+- `Geuneda.Core.Editor` 의 `UserConfigAssetBuildGuard` 는 Editor 폴더 밖, 또는 `Assets/StreamingAssets` 안(그 아래 Editor 폴더도 그대로 복사됨)의 `*.user.*`(대소문자 무시)가 있으면 플레이어 빌드를 실패시킵니다. Resources 만 보면 씬 참조나 Addressables 로 들어가는 경우를 놓치므로 범위를 좁히지 마세요. 경로 판단은 `FindUserAssetsThatCanShip` 순수 함수로 테스트합니다. `.user` 는 `Editor/Resources` 에 둡니다(에디터에서 읽히고 빌드에서 빠짐).
+- `EnvValue<T>` 는 직렬화 struct 입니다. 필드 이름(`_dev`, `_qa`, `_prod`)을 바꾸면 기존 에셋 값이 사라집니다.
+
+## 8. 테스트
 
 - `Tests/EditMode/` (`Geuneda.Core.Tests.EditMode`). 출력 대상은 기록용 `ILogSink` 로 바꾸고 `TearDown` 에서 되돌립니다. 디스패처 큐는 `ResetState`/`ProcessQueue` 를 직접 불러 확인합니다(InternalsVisibleTo).
+- 설정 에셋 실제 Resources 테스트는 `AssetDatabase.GenerateUniqueAssetPath` 로 만든 자기 임시 폴더(`Assets/GeunedaCoreConfigTestTemp*`)에만 에셋을 만들고, 만든 경우에만 `TearDown` 에서 지웁니다. 고정 경로를 지우지 마세요.
 - `Tests/PlayMode/` (`Geuneda.Core.Tests.PlayMode`). PlayerLoop 연결과 실제 프레임 처리처럼 플레이 중에만 확인할 수 있는 것.

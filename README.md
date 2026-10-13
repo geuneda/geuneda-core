@@ -8,6 +8,7 @@
 | 결과 규약 | `Result`, `Result<T>`, `ResultCodes` | `Geuneda.Core` |
 | 빌드 환경(DEV/QA/PROD) | `AppEnv`, `AppEnvironment` | `Geuneda.Core` |
 | 메인 스레드 디스패처 | `MainThreadDispatcher` | `Geuneda.Core` |
+| 설정 에셋 | `ConfigAssetLoader`, `ConfigAssetPathAttribute`, `EnvValue<T>` | `Geuneda.Core` |
 
 ## 설치
 
@@ -244,6 +245,45 @@ if (!MainThreadDispatcher.IsMainThread)
 - `IsMainThread` 는 플레이 세션이 시작될 때 기록한 메인 스레드와 비교합니다. 에디터를 연 뒤 한 번도 플레이하지 않았으면 false 이고, 한 번 기록한 뒤에는 편집 모드에서도 메인 스레드면 true 입니다.
 - PlayerLoop 를 통째로 새로 설정하는 코드(`PlayerLoop.SetPlayerLoop(PlayerLoop.GetDefaultPlayerLoop())` 등)가 있으면 처리 단계가 빠집니다. 다른 라이브러리처럼 `GetCurrentPlayerLoop` 를 고쳐 설정하세요.
 - UniTask 를 쓰는 코드는 `await UniTask.SwitchToMainThread()` 도 쓸 수 있습니다. 이 디스패처는 외부 의존성 없이 콜백 SDK 를 감쌀 때 씁니다.
+
+## 설정 에셋
+
+게임 ID, 서버 주소 같은 설정은 ScriptableObject 에셋에 두고, 부트스트랩에서 `ConfigAssetLoader` 로 한 번 읽어 services 의 `MainInstaller` 에 바인딩합니다.
+
+```csharp
+using Geuneda.Core;
+using UnityEngine;
+
+// Assets/Configs/Resources/Geuneda/GameConfig.asset
+[ConfigAssetPath("Geuneda/GameConfig")]
+[CreateAssetMenu(menuName = "Game/GameConfig")]
+public sealed class GameConfig : ScriptableObject, IGameConfig
+{
+    [SerializeField] private int _gameId;
+    [SerializeField] private EnvValue<string> _serverUrl;   // 인스펙터에서 dev/qa/prod 값을 각각 입력
+
+    public int GameId => _gameId;
+    public string ServerUrl => _serverUrl.Value;           // 이 빌드의 환경(AppEnv.Current) 값
+}
+
+// 부트스트랩
+var configs = new ConfigAssetLoader();
+MainInstaller.Bind<IGameConfig>(configs.Load<GameConfig>());
+```
+
+읽는 순서:
+
+1. 에디터에서만 `<경로>.user` (개인 덮어쓰기, `Editor/Resources` 폴더에 둠)
+2. `Resources/<경로>`
+3. 생성자에 넘긴 대체 로더 `Func<string, Object>`(예: Addressables 동기 로드). 경로를 그대로 받습니다.
+
+- 경로는 `[ConfigAssetPath("폴더/이름")]`(Resources 기준, 확장자 없이) 값이고, 속성이 없으면 타입 이름입니다.
+- 어디에도 없거나 경로의 에셋 타입이 다르면 `Load` 는 `InvalidOperationException` 입니다(프로젝트 구성 오류). 없을 수 있는 설정은 `TryLoad` 를 씁니다.
+- 로더는 캐시를 두지 않습니다. 부트스트랩에서 한 번 읽어 바인딩하고, 사용하는 쪽은 바인딩으로 받습니다.
+- `.user` 개인 덮어쓰기: `Editor/Resources` 폴더(예: `Assets/Editor/Resources/Geuneda/GameConfig.user.asset`)에 같은 경로로 두면 에디터에서 그 에셋을 먼저 씁니다(Info 로그를 남김). Editor 폴더 안의 Resources 는 에디터에서 `Resources.Load` 로 읽히고 빌드에서는 빠지므로, 빌드 전에 치울 필요가 없습니다. 플레이어에서는 `.user` 를 읽지 않습니다.
+- git 에 올리지 않도록 `.gitignore` 에 `*.user.asset` 과 `*.user.asset.meta` 를 넣으세요. 이름은 소문자 `.user` 로 씁니다.
+- `.user` 에셋(대소문자 무시)이 `Editor` 폴더 밖에 있거나 `Assets/StreamingAssets` 안에 있으면 빌드 전 훅(`Geuneda.Core.Editor`)이 플레이어 빌드를 실패시킵니다. Resources, 빌드 씬의 참조, Addressables 그룹, StreamingAssets(안의 Editor 폴더까지 그대로 복사) 중 어디로든 빌드 파일에 들어갈 수 있어서입니다. Addressables 콘텐츠 빌드만 따로 할 때는 검사하지 않습니다.
+- `EnvValue<T>` 는 dev/qa/prod 값을 모두 담고 `Value` 로 이 빌드의 환경 값을 고릅니다. 세 값이 모두 빌드에 들어가므로 비밀 값(키, 토큰)은 넣지 않습니다.
 
 ## 요구 사항
 

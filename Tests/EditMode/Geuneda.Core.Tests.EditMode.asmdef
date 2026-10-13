@@ -4,7 +4,8 @@
     "references": [
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "Geuneda.Core"
+        "Geuneda.Core",
+        "Geuneda.Core.Editor"
     ],
     "includePlatforms": [
         "Editor"

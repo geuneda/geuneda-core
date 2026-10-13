@@ -82,3 +82,7 @@ crashlytics-build.properties
 
 # Tests audit history (unity-tests-audit skill -- local developer state, never committed)
 .audit-history.md
+
+# Geuneda.Core 개인 덮어쓰기 설정 에셋(ConfigAssetLoader, Editor/Resources 에 둠)
+*.user.asset
+*.user.asset.meta
