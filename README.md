@@ -12,6 +12,7 @@
 | 설치 ID, 기기 ID | `IAppIdentity`, `AppIdentity` | `Geuneda.Core` |
 | 보안 저장소(iOS 키체인, Android 키스토어) | `ISecureStore`, `PlatformSecureStore`, `SecureReadResult` | `Geuneda.Core` |
 | 결정론적 난수(PCG32) | `Pcg32` | `Geuneda.Core` |
+| 단조 시계(기기가 잠든 동안에도 흐름) | `IMonotonicClock`, `MonotonicClock` | `Geuneda.Core` |
 
 ## 설치
 
@@ -188,13 +189,14 @@ else if (result.Code == ResultCodes.NetworkError || result.Code == ResultCodes.T
 | 3000 ~ 3999 | `com.geuneda.account`(`AccountResultCodes`) |
 | 4000 ~ 4999 | `com.geuneda.appsetting`(`AppSettingResultCodes`) |
 | 5000 ~ 5999 | `com.geuneda.resource`(`ResourceResultCodes`) |
-| 그 밖의 1000 단위 블록(6000 ~ 99999) | 패키지별. 패키지가 처음 코드를 정의할 때 다음 빈 블록을 이 표에 등록합니다 |
+| 6000 ~ 6999 | `com.geuneda.servertime`(`ServerTimeResultCodes`) |
+| 그 밖의 1000 단위 블록(7000 ~ 99999) | 패키지별. 패키지가 처음 코드를 정의할 때 다음 빈 블록을 이 표에 등록합니다 |
 | 100000 ~ 100999 | 실시간 RPC 서버 프레임워크 응답 상태(`com.geuneda.realtime` 의 `RpcStatusCodes`) |
 | 101000 이상 | 게임 |
 
 - 패키지 코드는 패키지의 `<패키지>ResultCodes` static 클래스에 상수로 둡니다. 예: 블록이 1000 이면 `public const int InvalidResponse = 1001;`
 - 서버가 내려주는 오류 코드는 게임 범위(101000 이상)로 정해 그대로 쓰거나(realtime), 통신 패키지가 자기 블록 안의 코드로 옮기거나, 응답 본문에 따로 둡니다.
-- 다음 빈 블록은 6000 입니다.
+- 다음 빈 블록은 7000 입니다.
 
 ## 빌드 환경
 
@@ -403,6 +405,32 @@ uint next = preview.NextUInt();           // rng 는 그대로
 - 가변 struct 입니다. `readonly` 필드에 두거나 프로퍼티로 꺼내 부르면 복사본이 진행해 원래 생성기는 그대로이니, 진행할 생성기는 `readonly` 가 아닌 필드나 지역 변수에 둡니다. `default(Pcg32)` 는 쓸 수 없습니다(`InvalidOperationException`). 스레드 안전하지 않습니다.
 - 잘못된 범위(`NextInt(5, 5)`, `NextIntInclusive(10, 5)`, `NextUInt(0)`)는 진행하지 않고 `ArgumentOutOfRangeException` 을 던집니다.
 - 정수 연산만 쓰고 UnityEngine 을 참조하지 않습니다. 자사 서버(.NET)는 `Runtime/Random/Pcg32.cs` 를 링크해 같은 수열을 재현할 수 있습니다(오버플로 검사를 켠 프로젝트에서도 같은 결과). 공식 테스트 벡터(`pcg32_srandom_r(42, 54)`)는 `Pcg32Test` 가 확인합니다.
+
+## 단조 시계 (`MonotonicClock`)
+
+기기 시계(`DateTime.UtcNow`)와 따로 흐르는 시계입니다. 사용자가 기기 시계를 바꿔도 영향받지 않고 값이 줄어들지 않으며, 할 수 있는 플랫폼에서는 기기가 잠든 동안에도 흐릅니다. services 의 시간 서비스가 이 시계로 현재 시각을 진행합니다.
+
+```csharp
+using Geuneda.Core;
+
+IMonotonicClock clock = new MonotonicClock();
+
+var start = clock.Elapsed;
+// ...
+TimeSpan spent = clock.Elapsed - start;   // 기기 시계를 바꿔도, 기기가 잠들었다 깨어나도 실제 경과
+```
+
+| 플랫폼 | 시계 | 잠자기 포함 |
+|--------|------|------------|
+| Android | libc `clock_gettime(CLOCK_BOOTTIME)` | 예 |
+| iOS | `Plugins/iOS/GeunedaMonotonicClock.mm` 의 `clock_gettime_nsec_np(CLOCK_MONOTONIC)` | 예 |
+| macOS 에디터·플레이어 | libc `clock_gettime(CLOCK_MONOTONIC)` | 예 |
+| 그 밖(Windows, Linux, WebGL) | `Stopwatch` | 플랫폼에 따름 |
+
+- 값의 기준점은 정해져 있지 않으므로(보통 기기 부팅) 두 값의 차이로 씁니다. 같은 기기에서는 인스턴스가 달라도 같은 시계라 값끼리 비교할 수 있습니다. 어느 스레드에서 읽어도 됩니다.
+- `IncludesSleep` 은 네이티브 시계를 쓰는지입니다. 네이티브 호출이 실패하면(라이브러리·함수 없음) 생성할 때 한 번 확인해 `Stopwatch` 로 바꾸고 false 입니다.
+- iOS 만 플러그인을 쓰는 것은 IL2CPP 가 `__Internal` 로 선언한 시스템 함수를 시스템 헤더 선언과 함께 컴파일하면 형식이 달라 충돌할 수 있어서입니다.
+- 테스트에서는 `IMonotonicClock` 을 직접 구현한 가짜 시계를 넘깁니다.
 
 ## 요구 사항
 

@@ -4,6 +4,12 @@
 이 형식은 [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)를 기반으로 하며,
 이 프로젝트는 [Semantic Versioning](http://semver.org/spec/v2.0.0.html)을 따릅니다.
 
+## [0.4.0] - 2026-10-14
+
+**New**:
+- 단조 시계 `IMonotonicClock`/`MonotonicClock`: 기기 시계 변경에 영향받지 않고 줄어들지 않는 경과 시간(`Elapsed`). Android 는 libc `CLOCK_BOOTTIME`, macOS 는 libc `CLOCK_MONOTONIC`, iOS 는 새 플러그인 `GeunedaMonotonicClock.mm`(`clock_gettime_nsec_np(CLOCK_MONOTONIC)`)이라 기기가 잠든 동안에도 흐릅니다. 그 밖의 플랫폼과 네이티브 호출 실패는 `Stopwatch`(`IncludesSleep` 이 false)
+- 결과 코드 범위 표에 `com.geuneda.servertime`(6000 ~ 6999) 등록
+
 ## [0.3.0] - 2026-10-14
 
 **New**:

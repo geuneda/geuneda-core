@@ -90,7 +90,15 @@
 - 범위 함수는 인자 검사를 진행 전에 하고, 성공하면 언제나 출력을 하나 이상 씁니다(데이터의 범위 값이 바뀌어도 수열 정렬이 덜 흔들리게). 2의 거듭제곱 마스크 같은 빠른 경로를 넣으면 수열이 바뀝니다.
 - 증가값 0 은 `default` 값의 표시로 씁니다. 생성 경로는 언제나 홀수 증가값을 넣습니다.
 
-## 11. 테스트
+## 11. 단조 시계 (`Runtime/Time/`)
+
+- `MonotonicClock` 은 Android 플레이어 `CLOCK_BOOTTIME`(7), macOS 에디터·플레이어 `CLOCK_MONOTONIC`(6)을 libc `clock_gettime` 으로, iOS 플레이어는 `Plugins/iOS/GeunedaMonotonicClock.mm`(`clock_gettime_nsec_np(CLOCK_MONOTONIC)`)으로 읽습니다. Darwin 의 `CLOCK_MONOTONIC` 은 잠자기를 포함합니다(포함하지 않는 것은 `CLOCK_UPTIME_RAW`. 2026-10-14 Mac 에서 두 값 차이가 잠든 시간과 같음을 확인). 잠자기를 빼는 시계로 바꾸면 백그라운드에서 돌아온 뒤 서버 시각이 뒤처집니다.
+- 플랫폼 분기는 에디터 define(`UNITY_EDITOR_OSX`)을 먼저 봅니다. 에디터에서도 빌드 대상의 `UNITY_ANDROID`/`UNITY_IOS` 가 켜지기 때문입니다.
+- `timespec` 필드는 `IntPtr` 입니다(32비트 Android 에서 `time_t`·`long` 이 32비트). iOS 에서 `__Internal` 로 시스템 함수(`clock_gettime_nsec_np`)를 직접 선언하지 마세요. IL2CPP 생성 코드의 선언이 시스템 헤더와 충돌할 수 있어 플러그인 함수 `GeunedaMonotonicClock_Nanoseconds` 를 거칩니다. 플러그인 meta 는 iOS 만 켭니다.
+- 네이티브 호출 실패는 생성자에서 한 번 확인해 `Stopwatch` 로 바꿉니다. 같은 인스턴스 안에서 시계를 바꾸면 값이 튀므로 읽을 때 바꾸지 마세요.
+- 기기 확인(2026-10-14): Android 13 에뮬레이터 IL2CPP High 코드 제거에서 `IncludesSleep` true, `SystemClock.elapsedRealtime` 과 1ms 안. iOS 27 시뮬레이터에서 true, 값이 Mac `CLOCK_MONOTONIC` 과 같음. 실제 기기의 깊은 잠자기 포함은 플랫폼 문서 근거이고 직접 재지는 않았습니다.
+
+## 12. 테스트
 
 - `Tests/EditMode/` (`Geuneda.Core.Tests.EditMode`). 출력 대상은 기록용 `ILogSink` 로 바꾸고 `TearDown` 에서 되돌립니다. 디스패처 큐는 `ResetState`/`ProcessQueue` 를 직접 불러 확인합니다(InternalsVisibleTo).
 - 설정 에셋 실제 Resources 테스트는 `AssetDatabase.GenerateUniqueAssetPath` 로 만든 자기 임시 폴더(`Assets/GeunedaCoreConfigTestTemp*`)에만 에셋을 만들고, 만든 경우에만 `TearDown` 에서 지웁니다. 고정 경로를 지우지 마세요.
