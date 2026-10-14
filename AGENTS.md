@@ -9,7 +9,7 @@
 
 ## 2. 규칙
 
-- **static 상태 허용 목록**(geuneda 결정 D2): 로거(`Log`)와 메인 스레드 디스패처(`MainThreadDispatcher`)만 static 가변 상태를 가질 수 있습니다. 그 밖의 서비스는 인터페이스로 만들고 services 의 `MainInstaller` 로 바인딩합니다. 허용 목록을 늘리려면 이 절을 먼저 고칩니다.
+- **static 상태 허용 목록**(geuneda 결정 D2): 로거(`Log`), 메인 스레드 디스패처(`MainThreadDispatcher`), gamedata 의 보안 값 변조 알림(`SecureValueMonitor.TamperDetected` 이벤트와 보안 값 인코딩의 내부 nonce 카운터)만 static 가변 상태를 가질 수 있습니다. 보안 값은 struct 를 읽는 순간 변조를 감지하므로 인스턴스 서비스로 알릴 방법이 없어 넣었습니다(nonce 카운터는 같은 세션 키로 nonce 를 다시 쓰지 않도록 세션 시작 때도 되돌리지 않습니다). 그 밖의 서비스는 인터페이스로 만들고 services 의 `MainInstaller` 로 바인딩합니다. 허용 목록을 늘리려면 이 절을 먼저 고칩니다.
 - static 가변 상태는 `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]` 에서 기본값으로 되돌립니다. 도메인 리로드를 끈 Enter Play Mode 에서 이전 세션 상태가 남지 않게 하기 위해서입니다.
 - 외부 패키지(UniTask, Newtonsoft 등)에 의존하지 않습니다. 필요하면 별도 패키지로 만듭니다.
 - 런타임 어셈블리에서 `UnityEditor` 를 참조하지 않습니다.
