@@ -83,7 +83,14 @@
 - C# 가 Java 클래스를 이름으로만 부르므로 R8 축소 빌드에서 지워질 수 있습니다. `Editor/AndroidProguardRulesHook.cs`(`#if UNITY_ANDROID`, `IPostGenerateGradleAndroidProject`)가 `AndroidProguardRules.Rule` 을 unityLibrary 의 `proguard-unity.txt`(unityLibrary 의 consumerProguardFiles)에 넣습니다. Java 클래스 이름이나 공개 메서드를 바꾸면 규칙도 바꿉니다.
 - 기기 동작(키 분실, 깨진 값, 앱 재시작 뒤 유지, 축소 빌드)은 에디터 테스트로 확인할 수 없습니다. 플랫폼 코드를 바꾸면 iOS 시뮬레이터와 Android 기기(또는 에뮬레이터)에서 다시 확인합니다.
 
-## 10. 테스트
+## 10. 결정론적 난수 (`Runtime/Random/`)
+
+- `Pcg32` 의 수열(생성자, `NextUInt` 의 XSH-RR 출력, SplitMix64 스트림, Lemire 범위, `NextIntInclusive` 의 전체 범위 처리)은 저장된 시드·위치와 서버 재현의 호환 불변식입니다. 바꾸면 같은 시드의 수열이 달라지므로 바꾸지 말고 새 타입을 만드세요. `Pcg32Test` 의 기대값(공식 데모 벡터와 Python 참조 구현으로 만든 값)을 고쳐서 테스트를 맞추지 마세요.
+- 서버가 이 파일 하나를 링크할 수 있어야 합니다. UnityEngine 이나 core 의 다른 타입을 참조하지 말고, 연산은 `unchecked` 블록에 둡니다(오버플로 검사를 켠 .NET 프로젝트에서 2026-10-14 확인).
+- 범위 함수는 인자 검사를 진행 전에 하고, 성공하면 언제나 출력을 하나 이상 씁니다(데이터의 범위 값이 바뀌어도 수열 정렬이 덜 흔들리게). 2의 거듭제곱 마스크 같은 빠른 경로를 넣으면 수열이 바뀝니다.
+- 증가값 0 은 `default` 값의 표시로 씁니다. 생성 경로는 언제나 홀수 증가값을 넣습니다.
+
+## 11. 테스트
 
 - `Tests/EditMode/` (`Geuneda.Core.Tests.EditMode`). 출력 대상은 기록용 `ILogSink` 로 바꾸고 `TearDown` 에서 되돌립니다. 디스패처 큐는 `ResetState`/`ProcessQueue` 를 직접 불러 확인합니다(InternalsVisibleTo).
 - 설정 에셋 실제 Resources 테스트는 `AssetDatabase.GenerateUniqueAssetPath` 로 만든 자기 임시 폴더(`Assets/GeunedaCoreConfigTestTemp*`)에만 에셋을 만들고, 만든 경우에만 `TearDown` 에서 지웁니다. 고정 경로를 지우지 마세요.

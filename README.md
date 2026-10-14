@@ -11,6 +11,7 @@
 | 설정 에셋 | `ConfigAssetLoader`, `ConfigAssetPathAttribute`, `EnvValue<T>` | `Geuneda.Core` |
 | 설치 ID, 기기 ID | `IAppIdentity`, `AppIdentity` | `Geuneda.Core` |
 | 보안 저장소(iOS 키체인, Android 키스토어) | `ISecureStore`, `PlatformSecureStore`, `SecureReadResult` | `Geuneda.Core` |
+| 결정론적 난수(PCG32) | `Pcg32` | `Geuneda.Core` |
 
 ## 설치
 
@@ -370,6 +371,38 @@ if (!store.TryDelete("my.refreshToken"))   // 원래 없었어도 true
 - Android R8 축소(Minify) 빌드에서도 동작합니다. 에디터 훅(`Geuneda.Core.Editor`)이 Gradle 프로젝트를 만들 때 Java 플러그인의 keep 규칙을 `unityLibrary/proguard-unity.txt` 에 넣습니다.
 - iOS 값은 앱을 지워도 남으므로, 다시 설치했을 때 지워야 하는 값(로그인 토큰 등)은 사용하는 쪽이 설치 여부를 확인해 지웁니다.
 - iOS 는 `Runtime/Plugins/iOS/GeunedaKeychain.mm`(Security.framework), Android 는 `Runtime/Plugins/Android/GeunedaSecureStore.java` 를 씁니다.
+
+## 결정론적 난수 (`Pcg32`)
+
+PCG32(XSH-RR) 생성기입니다. 시드와 스트림이 같으면 어느 플랫폼에서나 같은 수열을 냅니다. 게임에서는 보통 services 의 `IRngService` 를 쓰고, 이 타입은 그 아래 알고리즘과 서버 재현용입니다.
+
+```csharp
+using Geuneda.Core;
+
+var rng = new Pcg32(seed: 12345, stream: 0);
+
+uint raw    = rng.NextUInt();             // 32비트
+uint index  = rng.NextUInt(6);            // [0, 6)
+int damage  = rng.NextInt(-50, 50);       // [-50, 50)
+int dice    = rng.NextIntInclusive(1, 6); // [1, 6]
+
+ulong saved = rng.Position;               // 지금까지 낸 32비트 출력 수
+
+// 다시 만들기: 시드·스트림·위치 세 값이면 됨. O(log n)
+var restored = new Pcg32(12345, 0);
+restored.Advance(saved);
+
+// 미리 보기: 복사본은 따로 진행
+var preview = rng;
+uint next = preview.NextUInt();           // rng 는 그대로
+```
+
+- 상태는 64비트 LCG 상태, 홀수 증가값, `Position` 입니다. 스트림 번호는 SplitMix64 로 섞어 증가값을 만들므로 이웃한 번호끼리도 관련 없는 수열입니다. 스트림 번호는 SplitMix64 로 섞은 값의 하위 63비트를 증가값으로 쓰므로, 서로 다른 번호 한 쌍(섞은 값이 최상위 비트만 다른 번호)은 같은 수열이 됩니다. 0 부터 매긴 작은 번호끼리 겹칠 확률은 무시할 만하지만 임의의 ulong 번호 사이의 충돌 부재는 보장하지 않습니다. 같은 시드로 드랍·전투·가챠처럼 쓰임새마다 스트림을 나누면 한쪽에 뽑기를 추가해도 다른 쪽 수열이 밀리지 않습니다.
+- 범위 함수는 Lemire 방식이라 편향이 없습니다. 하위 값이 거절되면 출력을 하나 더 쓰므로 `Position` 은 호출 수가 아니라 쓴 출력 수입니다. 범위 함수는 항상 출력을 하나 이상 씁니다(`NextIntInclusive(7, 7)` 도 한 단계 진행).
+- `Advance(n)` 은 n 단계를 O(log n) 으로 건너뜁니다. 주기가 2^64 라 뒤로 n 단계는 `Advance(unchecked(0UL - n))`, 위치 p 로는 `Advance(unchecked(p - Position))` 입니다.
+- 가변 struct 입니다. `readonly` 필드에 두거나 프로퍼티로 꺼내 부르면 복사본이 진행해 원래 생성기는 그대로이니, 진행할 생성기는 `readonly` 가 아닌 필드나 지역 변수에 둡니다. `default(Pcg32)` 는 쓸 수 없습니다(`InvalidOperationException`). 스레드 안전하지 않습니다.
+- 잘못된 범위(`NextInt(5, 5)`, `NextIntInclusive(10, 5)`, `NextUInt(0)`)는 진행하지 않고 `ArgumentOutOfRangeException` 을 던집니다.
+- 정수 연산만 쓰고 UnityEngine 을 참조하지 않습니다. 자사 서버(.NET)는 `Runtime/Random/Pcg32.cs` 를 링크해 같은 수열을 재현할 수 있습니다(오버플로 검사를 켠 프로젝트에서도 같은 결과). 공식 테스트 벡터(`pcg32_srandom_r(42, 54)`)는 `Pcg32Test` 가 확인합니다.
 
 ## 요구 사항
 

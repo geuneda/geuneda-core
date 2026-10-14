@@ -4,6 +4,11 @@
 이 형식은 [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)를 기반으로 하며,
 이 프로젝트는 [Semantic Versioning](http://semver.org/spec/v2.0.0.html)을 따릅니다.
 
+## [0.3.0] - 2026-10-14
+
+**New**:
+- 결정론적 난수 생성기 `Pcg32`(PCG32 XSH-RR): `new Pcg32(seed, stream)`(스트림 번호는 SplitMix64 로 섞어 증가값을 만듦), `NextUInt()`, 편향 없는 범위 `NextUInt(bound)`/`NextInt(min, max)`/`NextIntInclusive(min, max)`(Lemire), O(log n) 건너뛰기 `Advance(delta)`(2^64 를 법으로 해 뒤로도 감), 쓴 출력 수 `Position`. 정수 연산만 쓰고 모두 unchecked 라 서버(.NET)가 파일을 링크해 같은 수열을 재현할 수 있습니다. `default` 값은 `InvalidOperationException`
+
 ## [0.2.0] - 2026-10-14
 
 **New**:
