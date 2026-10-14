@@ -185,13 +185,14 @@ else if (result.Code == ResultCodes.NetworkError || result.Code == ResultCodes.T
 | 1000 ~ 1999 | `com.geuneda.http`(`HttpResultCodes`) |
 | 2000 ~ 2999 | `com.geuneda.realtime`(`RealtimeResultCodes`) |
 | 3000 ~ 3999 | `com.geuneda.account`(`AccountResultCodes`) |
-| 그 밖의 1000 단위 블록(4000 ~ 99999) | 패키지별. 패키지가 처음 코드를 정의할 때 다음 빈 블록을 이 표에 등록합니다 |
+| 4000 ~ 4999 | `com.geuneda.appsetting`(`AppSettingResultCodes`) |
+| 그 밖의 1000 단위 블록(5000 ~ 99999) | 패키지별. 패키지가 처음 코드를 정의할 때 다음 빈 블록을 이 표에 등록합니다 |
 | 100000 ~ 100999 | 실시간 RPC 서버 프레임워크 응답 상태(`com.geuneda.realtime` 의 `RpcStatusCodes`) |
 | 101000 이상 | 게임 |
 
 - 패키지 코드는 패키지의 `<패키지>ResultCodes` static 클래스에 상수로 둡니다. 예: 블록이 1000 이면 `public const int InvalidResponse = 1001;`
 - 서버가 내려주는 오류 코드는 게임 범위(101000 이상)로 정해 그대로 쓰거나(realtime), 통신 패키지가 자기 블록 안의 코드로 옮기거나, 응답 본문에 따로 둡니다.
-- 다음 빈 블록은 4000 입니다.
+- 다음 빈 블록은 5000 입니다.
 
 ## 빌드 환경
 
