@@ -4,6 +4,18 @@
 이 형식은 [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)를 기반으로 하며,
 이 프로젝트는 [Semantic Versioning](http://semver.org/spec/v2.0.0.html)을 따릅니다.
 
+## [0.5.0] - 2026-10-17
+
+**New**:
+- 인증 암호화 `AesEncryption`(상태 없는 static): `Encrypt(key, plaintext, associatedData = null)` 와 `Decrypt(key, data, associatedData = null)`(`Result<byte[]>`). 형식 버전 1 은 `버전(1) || IV(16) || AES-256-CBC 암호문(PKCS7) || HMAC-SHA256 태그(32)` 의 encrypt-then-MAC 입니다. 32바이트 키를 HKDF-SHA256 으로 암호 키와 MAC 키로 나누고, 태그에 연관 데이터와 그 길이를 넣으며, 태그를 상수 시간으로 비교한 뒤에만 복호화합니다. UnityEngine 을 참조하지 않아 서버(.NET)가 `Runtime/Cryptography/`, `Runtime/Results/` 를 링크해 같은 형식을 읽고 쓸 수 있습니다. Unity Mono 의 `AesGcm` 은 `PlatformNotSupportedException` 이라 쓰지 않습니다
+- 기기 키 `IDeviceKeyProvider`/`DeviceKeyProvider`(`new DeviceKeyProvider()`): `PlatformSecureStore` 에 이름별 무작위 32바이트 키를 만들어 두고 돌려줍니다(`GetOrCreate`). 보안 저장소를 쓸 수 없으면 실패하고 고정 키·평문으로 대신하지 않습니다. 키체인·키스토어가 없는 곳(에디터, Windows, macOS, Linux, WebGL, Android API 22 이하)은 늘 실패합니다. 읽기가 `Failed` 면 새로 만들지 않고, 쓰기에 실패하면 그 항목을 지우며, 새 키는 다시 읽어 확인한 뒤 돌려줍니다. 기기 키로 암호화한 파일은 다른 기기로 옮기면 풀 수 없습니다
+- 공용 결과 코드 `InvalidFormat`(6), `UnsupportedVersion`(7), `IntegrityCheckFailed`(8), `SecureStoreUnavailable`(9)
+- 결과 코드 범위 표에 `com.geuneda.iap`(7000), `com.geuneda.ads`(8000), `com.geuneda.consent`(9000), `com.geuneda.notice`(10000), `com.geuneda.coupon`(11000), `com.geuneda.webview`(12000) 블록 등록
+
+**Changed**:
+- Android 보안 저장소 플러그인(`GeunedaSecureStore.java`): SharedPreferences 디스크 쓰기·삭제가 실패하면 그 항목의 메모리 값을 원래대로 되돌립니다. 전에는 실패한 쓰기의 값이 같은 실행 동안 읽혀, 다음 실행에 없을 값을 쓸 수 있었습니다
+- D2 static 허용 목록(`AGENTS.md`)에 gamedata 의 보안 값 변조 알림(`SecureValueMonitor`)과 services 의 `MainInstaller` 를 넣고, 가변 상태가 없는 static 순수 함수는 목록과 관계없음을 적었습니다(문서만)
+
 ## [0.4.0] - 2026-10-14
 
 **New**:

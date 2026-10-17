@@ -82,7 +82,8 @@ public final class GeunedaSecureStore {
         System.arraycopy(iv, 0, data, 0, IV_LENGTH);
         System.arraycopy(encrypted, 0, data, IV_LENGTH, encrypted.length);
 
-        commit(preferences(context).edit().putString(key, Base64.encodeToString(data, Base64.NO_WRAP)));
+        SharedPreferences preferences = preferences(context);
+        commit(preferences, key, preferences.edit().putString(key, Base64.encodeToString(data, Base64.NO_WRAP)));
     }
 
     /** 값을 지운다. 없어도 성공이고, 실패는 예외다. */
@@ -127,12 +128,30 @@ public final class GeunedaSecureStore {
     }
 
     private static void remove(SharedPreferences preferences, String key) throws IOException {
-        commit(preferences.edit().remove(key));
+        commit(preferences, key, preferences.edit().remove(key));
     }
 
-    private static void commit(SharedPreferences.Editor editor) throws IOException {
-        if (!editor.commit()) {
-            throw new IOException("Could not write secure store preferences");
+    /**
+     * 바꾼 항목을 디스크에 쓴다. SharedPreferences.commit 은 디스크 쓰기가 실패해도 메모리 값을 먼저 바꾸므로,
+     * 실패하면 그 항목의 메모리 값을 원래대로 되돌리고 예외를 던진다. 되돌리지 않으면 같은 실행의 읽기가 다음 실행에 없을 값을 돌려준다.
+     */
+    private static void commit(SharedPreferences preferences, String key, SharedPreferences.Editor editor) throws IOException {
+        String previous = preferences.getString(key, null);
+
+        if (editor.commit()) {
+            return;
         }
+
+        SharedPreferences.Editor rollback = preferences.edit();
+
+        if (previous == null) {
+            rollback.remove(key);
+        } else {
+            rollback.putString(key, previous);
+        }
+
+        // apply 는 메모리를 바로 바꾸고 디스크 쓰기만 뒤로 미룬다. 디스크에는 이미 원래 값이 있다
+        rollback.apply();
+        throw new IOException("Could not write secure store preferences");
     }
 }

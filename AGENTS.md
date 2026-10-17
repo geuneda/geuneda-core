@@ -9,7 +9,7 @@
 
 ## 2. 규칙
 
-- **static 상태 허용 목록**(geuneda 결정 D2): 로거(`Log`), 메인 스레드 디스패처(`MainThreadDispatcher`), gamedata 의 보안 값 변조 알림(`SecureValueMonitor.TamperDetected` 이벤트와 보안 값 인코딩의 내부 nonce 카운터), services 의 서비스 로케이터 `MainInstaller`(바인딩과 `BindingChanged` 처리기 목록)만 static 가변 상태를 가질 수 있습니다. `MainInstaller` 는 다른 서비스에 접근하는 입구라 처음부터 static 이었고, 서비스보다 먼저 만들어지는 화면이 늦은 바인딩과 교체를 따라갈 수 있도록 변경 알림을 함께 둡니다. 보안 값은 struct 를 읽는 순간 변조를 감지하므로 인스턴스 서비스로 알릴 방법이 없어 넣었습니다(nonce 카운터는 같은 세션 키로 nonce 를 다시 쓰지 않도록 세션 시작 때도 되돌리지 않습니다). 그 밖의 서비스는 인터페이스로 만들고 services 의 `MainInstaller` 로 바인딩합니다. 허용 목록을 늘리려면 이 절을 먼저 고칩니다.
+- **static 상태 허용 목록**(geuneda 결정 D2): 로거(`Log`), 메인 스레드 디스패처(`MainThreadDispatcher`), gamedata 의 보안 값 변조 알림(`SecureValueMonitor.TamperDetected` 이벤트와 보안 값 인코딩의 내부 nonce 카운터), services 의 서비스 로케이터 `MainInstaller`(바인딩과 `BindingChanged` 처리기 목록)만 static 가변 상태를 가질 수 있습니다. `MainInstaller` 는 다른 서비스에 접근하는 입구라 처음부터 static 이었고, 서비스보다 먼저 만들어지는 화면이 늦은 바인딩과 교체를 따라갈 수 있도록 변경 알림을 함께 둡니다. 보안 값은 struct 를 읽는 순간 변조를 감지하므로 인스턴스 서비스로 알릴 방법이 없어 넣었습니다(nonce 카운터는 같은 세션 키로 nonce 를 다시 쓰지 않도록 세션 시작 때도 되돌리지 않습니다). 그 밖의 서비스는 인터페이스로 만들고 services 의 `MainInstaller` 로 바인딩합니다. 허용 목록을 늘리려면 이 절을 먼저 고칩니다. 가변 상태가 없는 static 순수 함수(`ResultCodes.FromException`, `AppEnv.Resolve`, `AesEncryption`)는 이 목록과 관계없습니다.
 - static 가변 상태는 `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]` 에서 기본값으로 되돌립니다. 도메인 리로드를 끈 Enter Play Mode 에서 이전 세션 상태가 남지 않게 하기 위해서입니다.
 - 외부 패키지(UniTask, Newtonsoft 등)에 의존하지 않습니다. 필요하면 별도 패키지로 만듭니다.
 - 런타임 어셈블리에서 `UnityEditor` 를 참조하지 않습니다.
@@ -80,6 +80,7 @@
 - `PlatformSecureStore` 는 인자(빈 키, null 값, 키·값의 NUL 문자)를 검사한 뒤 플랫폼 구현(internal)에 넘깁니다. NUL 검사를 빼지 마세요. iOS 플러그인이 C 문자열로 다뤄 키가 잘리면 다른 항목을 덮어씁니다. 플랫폼 구현: iOS 플레이어 `IosKeychainStore`, Android 플레이어 API 23 이상 `AndroidKeystoreStore`, 그 밖은 `PlayerPrefsSecureStore`(키 접두사 `geuneda.secure.`). 구현은 실패를 반환값으로 바꾸고 예외를 내보내지 않습니다.
 - `GeunedaKeychain.mm` 은 ARC 여부와 관계없이 컴파일되도록 NSString 을 만들지 않고 바이트를 복사합니다. `GeunedaKeychain_Copy` 는 malloc 한 문자열을 돌려주고 IL2CPP 가 해제합니다(길이 0 이면 빈 문자열, 성공 상태에서 결과가 없으면 `errSecInternalError`). `GeunedaKeychain_Set` 은 갱신 후 없으면 추가하고, 추가할 때만 접근성(`AfterFirstUnlockThisDeviceOnly`)을 넣습니다. 함수 이름은 `IosKeychainStore` 의 `DllImport` 와 같아야 합니다. 플러그인 meta 는 iOS 만 켜고 `FrameworkDependencies: Security;` 입니다.
 - `GeunedaSecureStore.java`(meta 는 Android 만 켬)는 키스토어 별칭과 SharedPreferences 파일 이름이 모두 `geuneda.core.securestore` 이고, 값은 Base64(IV 12바이트 + 암호문 + 태그 16바이트)이며 저장 키(UTF-8)를 GCM 인증 데이터(AAD)로 넣습니다(항목 간 암호문 교체 검출). 키가 없거나, 형식이 깨졌거나, 태그가 맞지 않는(`AEADBadTagException`) 값은 지우고 null(NotFound)을 돌려줍니다. 그 밖의 예외는 C# 에서 `AndroidJavaException` 으로 잡아 `Failed`/false 입니다. 별칭, 파일 이름, 저장 형식을 바꾸면 기존 값을 읽지 못합니다.
+- `SharedPreferences.commit()` 은 디스크 쓰기가 실패해도 메모리 값을 먼저 바꿉니다. 플러그인의 `commit` 은 실패하면 그 항목의 메모리 값을 원래대로(`apply` 로) 되돌린 뒤 예외를 던집니다. 되돌리지 않으면 같은 실행의 읽기가 다음 실행에 없을 값(예: 기기 키)을 돌려줍니다. 실패를 주입한 기기 확인은 하지 않았습니다(2026-10-17, Gradle 컴파일만).
 - C# 가 Java 클래스를 이름으로만 부르므로 R8 축소 빌드에서 지워질 수 있습니다. `Editor/AndroidProguardRulesHook.cs`(`#if UNITY_ANDROID`, `IPostGenerateGradleAndroidProject`)가 `AndroidProguardRules.Rule` 을 unityLibrary 의 `proguard-unity.txt`(unityLibrary 의 consumerProguardFiles)에 넣습니다. Java 클래스 이름이나 공개 메서드를 바꾸면 규칙도 바꿉니다.
 - 기기 동작(키 분실, 깨진 값, 앱 재시작 뒤 유지, 축소 빌드)은 에디터 테스트로 확인할 수 없습니다. 플랫폼 코드를 바꾸면 iOS 시뮬레이터와 Android 기기(또는 에뮬레이터)에서 다시 확인합니다.
 
@@ -98,7 +99,22 @@
 - 네이티브 호출 실패는 생성자에서 한 번 확인해 `Stopwatch` 로 바꿉니다. 같은 인스턴스 안에서 시계를 바꾸면 값이 튀므로 읽을 때 바꾸지 마세요.
 - 기기 확인(2026-10-14): Android 13 에뮬레이터 IL2CPP High 코드 제거에서 `IncludesSleep` true, `SystemClock.elapsedRealtime` 과 1ms 안. iOS 27 시뮬레이터에서 true, 값이 Mac `CLOCK_MONOTONIC` 과 같음. 실제 기기의 깊은 잠자기 포함은 플랫폼 문서 근거이고 직접 재지는 않았습니다.
 
-## 12. 테스트
+## 12. 암호화 (`Runtime/Cryptography/`, `Runtime/SecureStorage/DeviceKeyProvider.cs`)
+
+- `AesEncryption` 형식 버전 1(바이트 배치 `버전 || IV 16 || CBC 암호문 || 태그 32`, HKDF info `geuneda.core.aes-256-cbc-hmac-sha256.v1`, 태그 입력 순서 `버전 || IV || 암호문 || 연관 데이터 || 연관 데이터 비트 길이 8바이트 빅엔디언`, PKCS7)은 저장된 파일과 서버의 호환 불변식입니다. 바꾸려면 버전 바이트를 올리고 이전 버전 복호화를 남깁니다. `AesEncryptionTest` 의 골든 벡터(Python cryptography 로 따로 구현해 만든 값)와 RFC 5869 벡터를 고쳐서 테스트를 맞추지 마세요.
+- 서버가 `Runtime/Cryptography/*.cs` 와 `Runtime/Results/*.cs` 를 링크할 수 있어야 합니다. UnityEngine 이나 로거 같은 core 의 다른 타입을 참조하지 말고, .NET 6 이후 obsolete 인 API(`AesManaged`, `RNGCryptoServiceProvider` 등)를 쓰지 마세요(2026-10-17 .NET 10 콘솔에서 경고를 오류로, 오버플로 검사를 켜고 링크해 Unity 와 서로 복호화 확인).
+- 좁히는 변환은 마스크로 값을 먼저 자릅니다(길이 블록의 `(byte) (x & 0xFFUL)`). Unity 는 오버플로 검사를 끄고 컴파일해 EditMode 테스트로는 잡히지 않고, 검사를 켠 서버에서만 연관 데이터 32바이트 이상일 때 `OverflowException` 이 납니다(리뷰에서 발견, .NET 콘솔에서 300바이트 골든 벡터로 재현·확인).
+- 태그는 `CryptographicOperations.FixedTimeEquals` 로 비교하고, 맞을 때만 복호화합니다(패딩 오라클 방지). `catch (CryptographicException)` 은 태그 검사 뒤의 `TransformFinalBlock` 에만 둡니다. 범위를 넓히면 플랫폼 암호 오류가 `InvalidFormat` 으로 숨겨집니다.
+- 태그에 연관 데이터 길이 블록을 넣는 것을 빼지 마세요. 빼면 연관 데이터 앞부분을 암호문 끝으로 옮긴 위조가 태그를 통과합니다(`Decrypt_AssociatedDataBlockMovedIntoCiphertext_IntegrityCheckFailed`).
+- Unity Mono 의 `AesGcm` 은 netstandard 2.1 참조에 있어 컴파일되지만 실행하면 `PlatformNotSupportedException` 입니다(6000.3.11f1 에디터 확인). HKDF 클래스는 없어 HMACSHA256 으로 RFC 5869 를 구현했습니다(internal `HkdfExtract`/`HkdfExpand`). `CryptographicOperations.FixedTimeEquals` 와 `RandomNumberGenerator.Fill` 은 Mono·IL2CPP 클래스 라이브러리와 .NET 10 에 모두 있습니다.
+- IL2CPP 코드 제거: Android IL2CPP High 빌드(2026-10-17)의 ManagedStripped 에 `Aes.Create()` 가 이름으로 만드는 System.Core 의 `AesCryptoServiceProvider`(와 `AesTransform`), mscorlib 의 `HMACSHA256`·`SHA256Managed`·`RandomNumberGenerator.Fill`·`CryptographicOperations.FixedTimeEquals` 가 남아 link.xml 이나 `[Preserve]` 없이 빌드됩니다. 기기에서 실행해 확인하지는 않았습니다(2026-10-17 기준, 확인하면 이 줄을 고칩니다). `Aes.Create()` 를 `new AesManaged()` 로 바꾸면 서버(.NET 6 이후)에서 obsolete 경고가 납니다.
+- `AesEncryption` 은 가변 상태가 없어 static 입니다(2절). 키나 파생 키를 static 에 캐시하지 마세요. 파생 키와 HKDF 중간 값(PRK, T(n), 입력 버퍼)은 쓰고 나서 `finally` 에서 지웁니다. 호출자가 넘긴 키와 돌려줄 출력은 지우지 않습니다.
+- `DeviceKeyProvider` 는 인스턴스이고 `IDeviceKeyProvider` 로 바인딩합니다. 공개 생성자는 인자가 없고 `PlatformSecureStore` 를 직접 만듭니다(`AppIdentity` 와 같은 방식). 저장소가 보호되는지(internal `PlatformSecureStore.IsProtected`, PlayerPrefs 대체면 false)를 알아야 해서 임의의 `ISecureStore` 를 받지 않습니다. 테스트는 internal 생성자 `(ISecureStore, bool isStoreProtected)` 로 가짜를 넣습니다. 저장 키 `geuneda.core.deviceKey.<이름>` 과 Base64 형식을 바꾸면 기존 키를 못 찾아 새 키를 만들고 이전 파일을 잃습니다.
+- 보호되지 않은 저장소(PlayerPrefs 대체, 에디터 포함)면 저장소를 건드리지 않고 실패합니다. 요청 원문이 "평문 대체로 빠지지 않는다"이므로 에디터 예외를 두지 않습니다(리뷰 2회차에서 에디터 예외를 되돌림). 에디터 예외를 넣으려면 팀 리드 승인을 먼저 받습니다.
+- 읽기 `Failed` 면 새 키를 만들지 않고, 쓰기에 실패하면 그 항목을 지우며, 새 키는 다시 읽어 같은 값일 때만 돌려주고, 저장된 값이 키 형식이 아니면 덮어쓰지 않습니다. 이 정책들을 빼면 `DeviceKeyProviderTest` 가 실패합니다(되돌림 실험으로 확인). 쓰기 실패 뒤 지우는 것은 실패한 쓰기가 메모리에 값을 남기는 저장소 대비이고, Android 는 플러그인이 스스로 되돌립니다(9절). 보안 저장소를 쓸 수 없을 때 고정 키, 메모리 키, 평문 대체로 빠지지 마세요.
+- 같은 이름의 키를 두 번 만들지 않는 것은 보안 저장소처럼 메인 스레드에서만 부르기 때문입니다. `ISecureStore.TryWrite` 는 덮어쓰기라 다른 스레드에서 동시에 부르면 두 키 중 하나를 잃습니다. 다른 스레드에서 부를 수 있게 하려면 잠금과 캐시를 함께 넣어야 합니다.
+
+## 13. 테스트
 
 - `Tests/EditMode/` (`Geuneda.Core.Tests.EditMode`). 출력 대상은 기록용 `ILogSink` 로 바꾸고 `TearDown` 에서 되돌립니다. 디스패처 큐는 `ResetState`/`ProcessQueue` 를 직접 불러 확인합니다(InternalsVisibleTo).
 - 설정 에셋 실제 Resources 테스트는 `AssetDatabase.GenerateUniqueAssetPath` 로 만든 자기 임시 폴더(`Assets/GeunedaCoreConfigTestTemp*`)에만 에셋을 만들고, 만든 경우에만 `TearDown` 에서 지웁니다. 고정 경로를 지우지 마세요.

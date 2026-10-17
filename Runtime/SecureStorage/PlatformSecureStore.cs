@@ -23,6 +23,9 @@ namespace Geuneda.Core
 	{
 		private readonly ISecureStore _store = CreatePlatformStore();
 
+		/// <summary>키체인이나 키스토어로 보호하는지입니다. PlayerPrefs 평문 대체(에디터 포함)면 false 입니다.</summary>
+		internal bool IsProtected => !(_store is PlayerPrefsSecureStore);
+
 		/// <inheritdoc />
 		/// <exception cref="ArgumentException"><paramref name="key"/> 가 null 이거나 빈 문자열이거나 NUL 문자를 담은 경우</exception>
 		public SecureReadResult TryRead(string key, out string value)

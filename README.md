@@ -13,6 +13,8 @@
 | 보안 저장소(iOS 키체인, Android 키스토어) | `ISecureStore`, `PlatformSecureStore`, `SecureReadResult` | `Geuneda.Core` |
 | 결정론적 난수(PCG32) | `Pcg32` | `Geuneda.Core` |
 | 단조 시계(기기가 잠든 동안에도 흐름) | `IMonotonicClock`, `MonotonicClock` | `Geuneda.Core` |
+| 인증 암호화(AES-256-CBC + HMAC-SHA256) | `AesEncryption` | `Geuneda.Core` |
+| 기기 키(보안 저장소에 둔 무작위 키) | `IDeviceKeyProvider`, `DeviceKeyProvider` | `Geuneda.Core` |
 
 ## 설치
 
@@ -175,6 +177,10 @@ else if (result.Code == ResultCodes.NetworkError || result.Code == ResultCodes.T
 | 3 | `Timeout` | 정해진 시간 안에 끝나지 않음 |
 | 4 | `NetworkError` | 네트워크에 연결할 수 없거나 연결이 끊김 |
 | 5 | `InProgress` | 같은 작업이 이미 진행 중이라 거절 |
+| 6 | `InvalidFormat` | 데이터 형식이 맞지 않음(잘림, 길이 오류, 잘못된 인코딩) |
+| 7 | `UnsupportedVersion` | 데이터의 형식 버전을 지원하지 않음(더 새 버전이 쓴 데이터 등) |
+| 8 | `IntegrityCheckFailed` | 무결성 검사 실패(변조, 다른 키, 다른 연관 데이터) |
+| 9 | `SecureStoreUnavailable` | 보안 저장소(키체인, 키스토어)를 읽거나 쓸 수 없음. 나중에 다시 시도할 수 있음 |
 
 ### 결과 코드 범위
 
@@ -355,7 +361,7 @@ switch (store.TryRead("my.refreshToken", out var token))
 ```
 
 ```csharp
-// 쓰기와 삭제. 실패하면 false(저장소 오류). 이 실행 동안은 메모리 값으로 계속할 수 있다
+// 쓰기와 삭제. 실패하면 false(저장소 오류)이고 저장소의 값은 이전 그대로다. 이 실행 동안은 메모리 값으로 계속할 수 있다
 if (!store.TryWrite("my.refreshToken", newToken))
 {
     // 다음 실행에서 다시 로그인해야 할 수 있음
@@ -437,6 +443,88 @@ TimeSpan spent = clock.Elapsed - start;   // 기기 시계를 바꿔도, 기기�
 - `IncludesSleep` 은 네이티브 시계를 쓰는지입니다. 네이티브 호출이 실패하면(라이브러리·함수 없음) 생성할 때 한 번 확인해 `Stopwatch` 로 바꾸고 false 입니다.
 - iOS 만 플러그인을 쓰는 것은 IL2CPP 가 `__Internal` 로 선언한 시스템 함수를 시스템 헤더 선언과 함께 컴파일하면 형식이 달라 충돌할 수 있어서입니다.
 - 테스트에서는 `IMonotonicClock` 을 직접 구현한 가짜 시계를 넘깁니다.
+
+## 암호화 (`AesEncryption`)
+
+세이브 파일이나 로그 캐시처럼 기기에 두는 데이터를 암호화하고, 고치거나 다른 파일과 바꿔치운 것을 검출합니다. 키는 호출자가 넘깁니다. 기기에만 두는 키가 필요하면 아래 `DeviceKeyProvider` 로 보안 저장소에 만들어 둡니다.
+
+```csharp
+using System.IO;
+using System.Text;
+using Geuneda.Core;
+
+// 부트스트랩(메인 스레드)
+MainInstaller.Bind<IDeviceKeyProvider>(new DeviceKeyProvider());
+
+// 키는 메인 스레드에서 받는다. 암호화와 복호화는 어느 스레드에서 해도 된다
+var keyResult = MainInstaller.Resolve<IDeviceKeyProvider>().GetOrCreate("save");
+if (!keyResult.TryGetValue(out var key))
+{
+    // SecureStoreUnavailable(보안 저장소가 없거나 쓸 수 없음) 또는 InvalidFormat(저장된 키가 깨짐). 이번에는 저장을 미룬다
+    return;
+}
+
+var aad = Encoding.UTF8.GetBytes("save/slot1");   // 용도와 파일 이름을 태그에 묶는다
+File.WriteAllBytes(path, AesEncryption.Encrypt(key, Encoding.UTF8.GetBytes(json), aad));
+
+var result = AesEncryption.Decrypt(key, File.ReadAllBytes(path), aad);
+if (result.TryGetValue(out var plaintext))
+{
+    Load(Encoding.UTF8.GetString(plaintext));
+}
+else if (result.Code == ResultCodes.UnsupportedVersion)
+{
+    // 더 새 버전 앱이 쓴 파일이거나 암호화하지 않은 옛 파일
+}
+else
+{
+    // InvalidFormat(잘림) 또는 IntegrityCheckFailed(변조, 다른 키, 다른 파일의 암호문). 백업이나 서버 데이터로 복구한다
+}
+```
+
+| 바이트 | 내용 |
+|--------|------|
+| 0 | 형식 버전 `1` |
+| 1 ~ 16 | IV(호출마다 무작위) |
+| 17 ~ | AES-256-CBC 암호문(PKCS7, 16 의 배수, 빈 평문도 16바이트) |
+| 끝 32 | 태그 `HMAC-SHA256(MAC 키, 버전 ‖ IV ‖ 암호문 ‖ 연관 데이터 ‖ 연관 데이터 비트 길이 8바이트 빅엔디언)` |
+
+- 키는 32바이트(`AesEncryption.KeySize`)입니다. 암호 키와 MAC 키는 이 키에서 HKDF-SHA256(salt 없음, info `geuneda.core.aes-256-cbc-hmac-sha256.v1`)으로 나눕니다. 비밀번호 같은 짧은 문자열을 키로 쓰지 마세요(키 늘이기를 하지 않습니다).
+- 결과는 평문보다 50 ~ 65바이트 깁니다(헤더 17, 태그 32, PKCS7 패딩 1 ~ 16). 데이터 전체를 메모리에 올려 처리합니다.
+- 복호화는 태그를 상수 시간으로 비교해 맞을 때만 합니다. 실패 코드는 `UnsupportedVersion`(첫 바이트가 1 이 아님. 암호화하지 않은 옛 파일도 여기로 옴), `InvalidFormat`(길이가 형식에 맞지 않음), `IntegrityCheckFailed`(변조, 다른 키, 다른 연관 데이터)입니다. 로그는 남기지 않으니 호출자가 남깁니다.
+- null 이거나 길이가 다른 키, null 평문·데이터는 예외입니다(오용).
+- 연관 데이터는 암호화하지 않고 태그에만 넣는 값입니다. 같은 키로 여러 파일을 쓸 때 용도와 파일 이름을 넣으면 다른 파일의 암호문을 옮겨 넣은 것을 `IntegrityCheckFailed` 로 거절합니다. 같은 파일의 예전 암호문으로 되돌린 것(롤백)은 검출하지 못합니다. null 과 빈 배열은 같습니다.
+- 상태가 없어 어느 스레드에서 불러도 됩니다.
+- 키 회전은 지원하지 않습니다. 형식에 키 ID 가 없으므로 키를 바꾸려면 호출자가 옛 키로 풀어 새 키로 다시 씁니다.
+- 기기 밖으로 옮긴 파일을 읽거나 고치지 못하게 하는 것입니다. 루팅·탈옥 기기에서 앱 메모리나 보안 저장소를 읽는 사람은 막지 못하므로, 재화처럼 서버가 기준인 값은 서버에서 확인합니다.
+- AES-GCM 대신 CBC + HMAC 을 쓰는 것은 Unity Mono 의 `AesGcm` 이 컴파일은 되지만 실행하면 `PlatformNotSupportedException` 이기 때문입니다(6000.3.11f1 에디터 확인).
+- UnityEngine 을 참조하지 않습니다. 자사 서버(.NET)는 `Runtime/Cryptography/AesEncryption.cs` 와 `Runtime/Results/*.cs` 를 링크해 같은 형식을 읽고 씁니다(.NET 10 에서 서로 복호화 확인).
+
+### 기기 키 (`DeviceKeyProvider`)
+
+- `GetOrCreate(name)` 은 `PlatformSecureStore` 의 `geuneda.core.deviceKey.<이름>` 항목에 Base64 로 둔 32바이트 키를 돌려주고, 없으면 무작위로 만들어 저장한 뒤 돌려줍니다. 용도마다 이름을 나눕니다(예: `save`, `logcache`). 돌려준 배열은 호출마다 새로 만든 것입니다.
+- 보안 저장소를 쓸 수 없으면 실패하고, 고정 키나 메모리 키, 평문 저장으로 대신하지 않습니다.
+
+| 상황 | 결과 | 이유 |
+|------|------|------|
+| 키체인·키스토어가 없는 곳(에디터, Windows, macOS, Linux, WebGL, Android API 22 이하) | `SecureStoreUnavailable`, 저장소를 건드리지 않음 | `PlatformSecureStore` 가 PlayerPrefs 평문으로 대신하는 곳이라 키가 보호되지 않음 |
+| 읽기가 `Failed`(예: iOS 기기를 한 번도 잠금 해제하지 않은 백그라운드 실행) | `SecureStoreUnavailable`, 새 키를 만들지 않음 | 키가 있는데 못 읽은 것일 수 있어 덮어쓰면 이전 파일을 잃음 |
+| 새 키를 쓰지 못함 | `SecureStoreUnavailable`, 그 항목을 지움 | 다음 실행에 같은 키를 얻을 수 없음. 실패한 쓰기가 메모리에 값을 남기는 저장소에서 같은 실행의 다음 호출이 그 키를 돌려주지 않게 함 |
+| 새 키를 썼는데 다시 읽어 같은 값이 나오지 않음 | `SecureStoreUnavailable` | 그 키로 암호화하면 다음 실행에 풀 수 없음. 쓴 값이 남아 있으면 다음 호출이 그 값을 돌려줌 |
+| 저장된 값이 32바이트 키가 아님 | `InvalidFormat`(Error 로그), 덮어쓰지 않음 | 몰래 새 키로 바꾸지 않음 |
+
+- 보안 저장소처럼 메인 스레드에서 부릅니다. 호출이 메인 스레드에서 차례로 실행되므로 같은 이름의 키를 두 번 만들지 않습니다. 받은 키로 하는 암호화는 다른 스레드에서 해도 됩니다.
+- 기기 키는 기기를 떠나지 않습니다. 이 키로 암호화한 파일은 다음 경우에 풀 수 없습니다(`IntegrityCheckFailed`).
+
+| 상황 | iOS(키체인 `AfterFirstUnlockThisDeviceOnly`) | Android(키스토어로 암호화한 SharedPreferences) |
+|------|------|------|
+| 앱을 지우고 다시 설치 | 키는 남음(앱 폴더의 파일은 함께 지워짐) | 키가 사라짐 |
+| 백업을 다른 기기에 복원, 파일을 다른 기기로 복사 | 키가 옮겨지지 않음 | 키가 옮겨지지 않음(자동 백업으로 파일이 돌아와도 풀 수 없음) |
+| 키스토어 키를 잃음 | | 보안 저장소가 값을 지우고 새 키를 만듦 |
+
+- 그래서 기기 키로는 잃어도 되는 캐시나 서버에서 다시 받을 수 있는 데이터를 암호화합니다. 기기를 옮겨도 남아야 하는 세이브는 서버 백업과 함께 쓰거나 서버가 내려준 키를 `AesEncryption` 에 넘깁니다.
+- 에디터도 보안 저장소가 PlayerPrefs(평문)라 늘 `SecureStoreUnavailable` 입니다. 에디터에서 암호화 흐름을 시험하려면 개발용 `IDeviceKeyProvider` 를 바인딩하거나 `AesEncryption` 에 직접 키를 넘깁니다.
+- 사용하는 쪽의 테스트에서는 `IDeviceKeyProvider` 를 직접 구현한 가짜를 넘깁니다.
 
 ## 요구 사항
 
