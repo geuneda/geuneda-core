@@ -280,19 +280,23 @@ namespace Geuneda.Core.Tests
 		}
 
 		[Test]
-		public void GetOrCreate_DefaultConstructorInEditor_FailsWithoutStoringKey()
+		public void GetOrCreate_DefaultConstructorInEditor_StoresKeyInPlayerPrefs()
 		{
-			// 에디터의 PlatformSecureStore 는 PlayerPrefs 평문이라 기기 키를 두지 않는다
+			// 에디터의 PlatformSecureStore 는 PlayerPrefs 평문이지만, 에디터에서만 개발용으로 기기 키를 둔다
 			var name = "test." + Guid.NewGuid().ToString("N");
 			var prefsKey = PlayerPrefsSecureStore.KeyPrefix + DeviceKeyProvider.KeyPrefix + name;
 			Assert.IsFalse(new PlatformSecureStore().IsProtected);
 
 			try
 			{
-				var result = new DeviceKeyProvider().GetOrCreate(name);
+				var first = new DeviceKeyProvider().GetOrCreate(name);
+				var second = new DeviceKeyProvider().GetOrCreate(name);
 
-				Assert.AreEqual(ResultCodes.SecureStoreUnavailable, result.Code);
-				Assert.IsFalse(PlayerPrefs.HasKey(prefsKey));
+				Assert.IsTrue(first.IsSuccess, first.ToString());
+				Assert.AreEqual(AesEncryption.KeySize, first.Value.Length);
+				Assert.IsTrue(PlayerPrefs.HasKey(prefsKey));
+				Assert.IsTrue(second.IsSuccess, second.ToString());
+				CollectionAssert.AreEqual(first.Value, second.Value);
 			}
 			finally
 			{

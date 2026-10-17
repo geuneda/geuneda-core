@@ -2,7 +2,7 @@
   "name": "com.geuneda.core",
   "displayName": "Geuneda Core",
   "author": "geuneda",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "unity": "2021.3",
   "license": "MIT",
   "description": "다른 Geuneda 패키지가 함께 쓰는 바닥 패키지입니다. 의존성이 없습니다. 현재 기능: 모듈별 로거(레벨 비트 플래그, 호출자 정보, 교체 가능한 출력, 릴리스 빌드에서 Verbose/Debug 제거), 결과 규약(Result, Result<T>, 공용 결과 코드와 패키지별 코드 범위), 빌드 환경(DEV/QA/PROD define 으로 정하는 AppEnv), 메인 스레드 디스패처, 설정 에셋 로더(.user 개인 덮어쓰기, 환경별 값), 설치 ID·기기 ID(iOS 키체인), 보안 저장소(iOS 키체인, Android 키스토어 AES-GCM, 그 밖은 PlayerPrefs), 결정론적 난수 생성기(PCG32), 기기가 잠든 동안에도 흐르는 단조 시계, 인증 암호화(AES-256-CBC + HMAC-SHA256)와 보안 저장소에 둔 기기 키.",

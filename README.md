@@ -507,7 +507,7 @@ else
 
 | 상황 | 결과 | 이유 |
 |------|------|------|
-| 키체인·키스토어가 없는 곳(에디터, Windows, macOS, Linux, WebGL, Android API 22 이하) | `SecureStoreUnavailable`, 저장소를 건드리지 않음 | `PlatformSecureStore` 가 PlayerPrefs 평문으로 대신하는 곳이라 키가 보호되지 않음 |
+| 키체인·키스토어가 없는 플레이어(Windows, macOS, Linux, WebGL, Android API 22 이하). 에디터는 예외로 PlayerPrefs 평문에 둠(0.5.1) | `SecureStoreUnavailable`, 저장소를 건드리지 않음 | `PlatformSecureStore` 가 PlayerPrefs 평문으로 대신하는 곳이라 키가 보호되지 않음 |
 | 읽기가 `Failed`(예: iOS 기기를 한 번도 잠금 해제하지 않은 백그라운드 실행) | `SecureStoreUnavailable`, 새 키를 만들지 않음 | 키가 있는데 못 읽은 것일 수 있어 덮어쓰면 이전 파일을 잃음 |
 | 새 키를 쓰지 못함 | `SecureStoreUnavailable`, 그 항목을 지움 | 다음 실행에 같은 키를 얻을 수 없음. 실패한 쓰기가 메모리에 값을 남기는 저장소에서 같은 실행의 다음 호출이 그 키를 돌려주지 않게 함 |
 | 새 키를 썼는데 다시 읽어 같은 값이 나오지 않음 | `SecureStoreUnavailable` | 그 키로 암호화하면 다음 실행에 풀 수 없음. 쓴 값이 남아 있으면 다음 호출이 그 값을 돌려줌 |
@@ -523,7 +523,7 @@ else
 | 키스토어 키를 잃음 | | 보안 저장소가 값을 지우고 새 키를 만듦 |
 
 - 그래서 기기 키로는 잃어도 되는 캐시나 서버에서 다시 받을 수 있는 데이터를 암호화합니다. 기기를 옮겨도 남아야 하는 세이브는 서버 백업과 함께 쓰거나 서버가 내려준 키를 `AesEncryption` 에 넘깁니다.
-- 에디터도 보안 저장소가 PlayerPrefs(평문)라 늘 `SecureStoreUnavailable` 입니다. 에디터에서 암호화 흐름을 시험하려면 개발용 `IDeviceKeyProvider` 를 바인딩하거나 `AesEncryption` 에 직접 키를 넘깁니다.
+- 에디터는 키체인·키스토어가 없지만 개발 중 시험할 수 있게 예외로 PlayerPrefs(평문)에 키를 둡니다(0.5.1). 이 예외는 플레이어 빌드에 들어가지 않으므로, Windows·macOS·Linux·WebGL·Android API 22 이하 플레이어는 지금처럼 `SecureStoreUnavailable` 입니다. 에디터의 키는 PlayerPrefs 를 지우면 사라집니다.
 - 사용하는 쪽의 테스트에서는 `IDeviceKeyProvider` 를 직접 구현한 가짜를 넘깁니다.
 
 ## 요구 사항

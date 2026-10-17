@@ -18,7 +18,8 @@ namespace Geuneda.Core
 	/// <para>
 	/// 보안 저장소를 쓸 수 없으면 실패를 돌려주고, 고정 키나 메모리 키, 평문 저장으로 대신하지 않습니다.
 	/// <list type="bullet">
-	/// <item>키체인·키스토어가 없어 <see cref="PlatformSecureStore"/> 가 PlayerPrefs 평문을 쓰는 곳(에디터, Windows, macOS, Linux, WebGL, Android API 22 이하)은 저장소를 건드리지 않고 실패합니다. 에디터에서 시험하려면 개발용 <see cref="IDeviceKeyProvider"/> 를 바인딩합니다.</item>
+	/// <item>키체인·키스토어가 없어 <see cref="PlatformSecureStore"/> 가 PlayerPrefs 평문을 쓰는 플레이어(Windows, macOS, Linux, WebGL, Android API 22 이하)는 저장소를 건드리지 않고 실패합니다.</item>
+	/// <item>에디터만 예외로, 개발 중 시험할 수 있게 PlayerPrefs 평문에 키를 둡니다. 이 예외는 플레이어 빌드에 들어가지 않습니다.</item>
 	/// <item>읽기가 <see cref="SecureReadResult.Failed"/> 면 키가 있는지 모르므로 새로 만들지 않습니다(기존 키를 덮어써 이전 파일을 잃지 않게).</item>
 	/// <item>새 키를 쓰지 못하면 그 항목을 지웁니다. 실패한 쓰기가 메모리에 값을 남기는 저장소에서 다음 호출이 다음 실행에 없을 키를 돌려주지 않게 하기 위해서입니다(Android 플러그인은 실패한 commit 의 메모리 값을 스스로 되돌림).</item>
 	/// <item>새 키를 쓴 뒤 다시 읽어 같은 값이 나올 때만 돌려줍니다. 쓴 값을 읽을 수 없으면 그 키로 암호화한 파일을 다음 실행에서 풀 수 없기 때문입니다.</item>
@@ -43,8 +44,18 @@ namespace Geuneda.Core
 		{
 		}
 
-		private DeviceKeyProvider(PlatformSecureStore store) : this(store, store.IsProtected)
+		private DeviceKeyProvider(PlatformSecureStore store) : this(store, IsUsable(store))
 		{
+		}
+
+		private static bool IsUsable(PlatformSecureStore store)
+		{
+#if UNITY_EDITOR
+			// 에디터는 키체인·키스토어가 없어 PlayerPrefs 평문이지만, 개발 중 암호화 흐름을 시험할 수 있게 허용한다. 플레이어 빌드에는 들어가지 않는다
+			return true;
+#else
+			return store.IsProtected;
+#endif
 		}
 
 		/// <param name="isStoreProtected">false 면 저장소를 건드리지 않고 <see cref="ResultCodes.SecureStoreUnavailable"/> 입니다.</param>

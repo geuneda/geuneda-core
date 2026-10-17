@@ -4,6 +4,11 @@
 이 형식은 [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)를 기반으로 하며,
 이 프로젝트는 [Semantic Versioning](http://semver.org/spec/v2.0.0.html)을 따릅니다.
 
+## [0.5.1] - 2026-10-17
+
+**Changed**:
+- `DeviceKeyProvider` 를 에디터에서도 쓸 수 있습니다. 에디터는 키체인·키스토어가 없어 0.5.0 에서는 늘 `SecureStoreUnavailable` 이었지만, 개발 중 암호화 흐름을 시험할 수 있게 PlayerPrefs(평문)에 키를 둡니다. 이 예외는 `#if UNITY_EDITOR` 라 플레이어 빌드에는 들어가지 않고, 키체인·키스토어가 없는 플레이어(Windows, macOS, Linux, WebGL, Android API 22 이하)는 그대로 실패합니다
+
 ## [0.5.0] - 2026-10-17
 
 **New**:
