@@ -4,6 +4,11 @@
 이 형식은 [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)를 기반으로 하며,
 이 프로젝트는 [Semantic Versioning](http://semver.org/spec/v2.0.0.html)을 따릅니다.
 
+## [0.5.2] - 2026-10-29
+
+**Fixed**:
+- `UserConfigAssetBuildGuard` 가 StreamingAssets 밖의 스크립트(`.cs`)를 개인 설정 에셋으로 잘못 보고 플레이어 빌드를 막던 문제를 고쳤습니다. Photon Quantum 의 partial 파일(`Frame.User.cs`, `RuntimeConfig.User.cs` 등)처럼 이름이 `.User` 로 끝나는 스크립트가 있으면 빌드할 수 없었습니다. 스크립트는 어셈블리로 컴파일되어 원본이 빌드에 들어가지 않습니다. StreamingAssets 안의 `.cs` 는 원본이 복사되므로 그대로 거부합니다
+
 ## [0.5.1] - 2026-10-17
 
 **Changed**:

@@ -28,7 +28,10 @@ namespace Geuneda.Core.Tests
 				"Assets/Resources/Game.user",
 				"Assets/StreamingAssets/Editor/Resources/GameConfig.user.asset",
 				"Assets/StreamingAssets/Editor/Game.USER.json",
-				"Assets/StreamingAssets/Game.json"
+				"Assets/StreamingAssets/Game.json",
+				"Assets/QuantumUser/Simulation/Frame.User.cs",
+				"Assets/Scripts/Game.user.CS",
+				"Assets/StreamingAssets/Frame.User.cs"
 			};
 
 			var found = UserConfigAssetBuildGuard.FindUserAssetsThatCanShip(paths);
@@ -43,7 +46,8 @@ namespace Geuneda.Core.Tests
 				"Assets/resources/Game.USER.asset",
 				"Assets/RESOURCES/Game.User.asset",
 				"Assets/StreamingAssets/Editor/Resources/GameConfig.user.asset",
-				"Assets/StreamingAssets/Editor/Game.USER.json"
+				"Assets/StreamingAssets/Editor/Game.USER.json",
+				"Assets/StreamingAssets/Frame.User.cs"
 			}, found);
 		}
 	}

@@ -42,7 +42,7 @@ namespace Geuneda.Core.Editor
 
 		/// <summary>
 		/// <paramref name="assetPaths"/> 중 확장자를 뺀 이름이 <c>.user</c> 로 끝나고(대소문자 무시), 경로에 <c>Editor</c> 폴더가 없거나
-		/// <c>Assets/StreamingAssets/</c> 아래에 있는 에셋 경로입니다.
+		/// <c>Assets/StreamingAssets/</c> 아래에 있는 에셋 경로입니다. StreamingAssets 밖의 스크립트(<c>.cs</c>)는 빌드에 원본이 들어가지 않으므로 뺍니다.
 		/// </summary>
 		/// <remarks>
 		/// <c>.user</c> 는 Unity 의 Resources 경로처럼 대소문자를 가리지 않습니다. <c>Editor</c> 는 정확히 일치할 때만 제외해, 모호하면 거부하는 쪽으로 둡니다.
@@ -62,6 +62,12 @@ namespace Geuneda.Core.Editor
 
 				// StreamingAssets 는 파일을 그대로 복사하므로 Editor 폴더 예외를 적용하지 않는다
 				var isStreamingAsset = path.StartsWith("Assets/StreamingAssets/", StringComparison.OrdinalIgnoreCase);
+
+				// 스크립트는 어셈블리로 컴파일되고 원본은 빌드에 들어가지 않는다(예: Quantum 의 partial 파일 Frame.User.cs)
+				if (!isStreamingAsset && path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+				{
+					continue;
+				}
 
 				if (isStreamingAsset || Array.IndexOf(path.Split('/'), "Editor") < 0)
 				{

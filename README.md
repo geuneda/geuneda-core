@@ -305,7 +305,7 @@ MainInstaller.Bind<IGameConfig>(configs.Load<GameConfig>());
 - 로더는 캐시를 두지 않습니다. 부트스트랩에서 한 번 읽어 바인딩하고, 사용하는 쪽은 바인딩으로 받습니다.
 - `.user` 개인 덮어쓰기: `Editor/Resources` 폴더(예: `Assets/Editor/Resources/Geuneda/GameConfig.user.asset`)에 같은 경로로 두면 에디터에서 그 에셋을 먼저 씁니다(Info 로그를 남김). Editor 폴더 안의 Resources 는 에디터에서 `Resources.Load` 로 읽히고 빌드에서는 빠지므로, 빌드 전에 치울 필요가 없습니다. 플레이어에서는 `.user` 를 읽지 않습니다.
 - git 에 올리지 않도록 `.gitignore` 에 `*.user.asset` 과 `*.user.asset.meta` 를 넣으세요. 이름은 소문자 `.user` 로 씁니다.
-- `.user` 에셋(대소문자 무시)이 `Editor` 폴더 밖에 있거나 `Assets/StreamingAssets` 안에 있으면 빌드 전 훅(`Geuneda.Core.Editor`)이 플레이어 빌드를 실패시킵니다. Resources, 빌드 씬의 참조, Addressables 그룹, StreamingAssets(안의 Editor 폴더까지 그대로 복사) 중 어디로든 빌드 파일에 들어갈 수 있어서입니다. Addressables 콘텐츠 빌드만 따로 할 때는 검사하지 않습니다.
+- `.user` 에셋(대소문자 무시)이 `Editor` 폴더 밖에 있거나 `Assets/StreamingAssets` 안에 있으면 빌드 전 훅(`Geuneda.Core.Editor`)이 플레이어 빌드를 실패시킵니다(StreamingAssets 밖의 스크립트 `.cs` 는 원본이 빌드에 들어가지 않아 검사하지 않습니다). Resources, 빌드 씬의 참조, Addressables 그룹, StreamingAssets(안의 Editor 폴더까지 그대로 복사) 중 어디로든 빌드 파일에 들어갈 수 있어서입니다. Addressables 콘텐츠 빌드만 따로 할 때는 검사하지 않습니다.
 - `EnvValue<T>` 는 dev/qa/prod 값을 모두 담고 `Value` 로 이 빌드의 환경 값을 고릅니다. 세 값이 모두 빌드에 들어가므로 비밀 값(키, 토큰)은 넣지 않습니다.
 
 ## 설치 ID 와 기기 ID

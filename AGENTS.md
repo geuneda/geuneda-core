@@ -65,7 +65,7 @@
 
 - `ConfigAssetLoader` 는 인스턴스이고 캐시가 없습니다(D2: static 가변 상태 금지). 대체 로더도 생성자로 받습니다. 정적 캐시나 전역 대체 로더를 추가하지 마세요.
 - 읽는 순서는 에디터에서만 `.user`, Resources, 대체 로더입니다. `.user` 판단은 컴파일 상수(`UNITY_EDITOR`)이고, 테스트는 internal 생성자로 Resources 함수와 `.user` 여부를 바꿉니다.
-- `Geuneda.Core.Editor` 의 `UserConfigAssetBuildGuard` 는 Editor 폴더 밖, 또는 `Assets/StreamingAssets` 안(그 아래 Editor 폴더도 그대로 복사됨)의 `*.user.*`(대소문자 무시)가 있으면 플레이어 빌드를 실패시킵니다. Resources 만 보면 씬 참조나 Addressables 로 들어가는 경우를 놓치므로 범위를 좁히지 마세요. 경로 판단은 `FindUserAssetsThatCanShip` 순수 함수로 테스트합니다. `.user` 는 `Editor/Resources` 에 둡니다(에디터에서 읽히고 빌드에서 빠짐).
+- `Geuneda.Core.Editor` 의 `UserConfigAssetBuildGuard` 는 Editor 폴더 밖, 또는 `Assets/StreamingAssets` 안(그 아래 Editor 폴더도 그대로 복사됨)의 `*.user.*`(대소문자 무시)가 있으면 플레이어 빌드를 실패시킵니다. StreamingAssets 밖의 스크립트(`.cs`)는 원본이 빌드에 들어가지 않으므로 뺍니다(Quantum `Frame.User.cs` 같은 partial 파일 오탐, 0.5.2). Resources 만 보면 씬 참조나 Addressables 로 들어가는 경우를 놓치므로 범위를 좁히지 마세요. 경로 판단은 `FindUserAssetsThatCanShip` 순수 함수로 테스트합니다. `.user` 는 `Editor/Resources` 에 둡니다(에디터에서 읽히고 빌드에서 빠짐).
 - `EnvValue<T>` 는 직렬화 struct 입니다. 필드 이름(`_dev`, `_qa`, `_prod`)을 바꾸면 기존 에셋 값이 사라집니다.
 
 ## 8. 설치 ID 와 기기 ID (`Runtime/Identity/`)
